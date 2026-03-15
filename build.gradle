@@ -56,8 +56,8 @@ bootJar {
 
 sonar {
     properties {
-        property "sonar.projectKey", System.getenv("MoritzDav_sopra-fs26-group-04-server")
-        property "sonar.organization", System.getenv("moritzdav")
+        property "sonar.projectKey", System.getenv("SONAR_PROJECT_KEY")
+        property "sonar.organization", System.getenv("SONAR_ORGANIZATION")
         property "sonar.host.url", "https://sonarcloud.io"
     }
 }
