@@ -1,51 +1,20 @@
-package ch.uzh.ifi.hase.soprafs26.entity;
+package ch.uzh.ifi.hase.soprafs26.rest.dto;
 
-import jakarta.persistence.*;
-
-import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
+import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
 
-import java.io.Serializable;
+//This is the one DTO that gets returned to the Frontend after successful user registration or login
+public class UserAuthDTO {
 
-/**
- * Internal User Representation
- * This class composes the internal representation of the user and defines how
- * the user is stored in the database.
- * Every variable will be mapped into a database field with the @Column
- * annotation
- * - nullable = false -> this cannot be left empty
- * - unique = true -> this value must be unqiue across the database -> composes
- * the primary key
- */
-@Entity
-@Table(name = "users")
-public class User implements Serializable {
-
-	private static final long serialVersionUID = 1L;
-
-	@Id
-	@GeneratedValue
-	private Long id;
-
-	@Column(nullable = false)
+    private Long id;
 	private String firstName;
-
-	@Column(nullable = false)
 	private String lastName;
-
-	@Column(nullable = false, unique = true)
 	private String username;
-
-	@Column(nullable = false, unique = true)
 	private String token;
-
-	@Column(nullable = false)
 	private UserStatus status;
-
-	@Column(nullable = false)
 	private UserRole role;
 
-	public Long getId() {
+    public Long getId() {
 		return id;
 	}
 
@@ -100,4 +69,5 @@ public class User implements Serializable {
 	public void setRole(UserRole role) {
 		this.role = role;
 	}
+    
 }
