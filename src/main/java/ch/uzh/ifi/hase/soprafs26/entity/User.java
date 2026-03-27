@@ -3,6 +3,7 @@ package ch.uzh.ifi.hase.soprafs26.entity;
 import jakarta.persistence.*;
 
 import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
+import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 
 import java.io.Serializable;
 
@@ -27,7 +28,10 @@ public class User implements Serializable {
 	private Long id;
 
 	@Column(nullable = false)
-	private String name;
+	private String firstName;
+
+	@Column(nullable = false)
+	private String lastName;
 
 	@Column(nullable = false, unique = true)
 	private String username;
@@ -35,8 +39,14 @@ public class User implements Serializable {
 	@Column(nullable = false, unique = true)
 	private String token;
 
+	@Column(nullable = false, unique = true)
+	private String password;
+
 	@Column(nullable = false)
 	private UserStatus status;
+
+	@Column(nullable = false)
+	private UserRole role;
 
 	public Long getId() {
 		return id;
@@ -46,12 +56,20 @@ public class User implements Serializable {
 		this.id = id;
 	}
 
-	public String getName() {
-		return name;
+	public String getFirstName() {
+		return firstName;
 	}
 
-	public void setName(String name) {
-		this.name = name;
+	public void setFirstName(String firstName) {
+		this.firstName = firstName;
+	}
+
+	public String getLastName() {
+		return lastName;
+	}
+
+	public void setLastName(String lastName) {
+		this.lastName = lastName;
 	}
 
 	public String getUsername() {
@@ -70,11 +88,27 @@ public class User implements Serializable {
 		this.token = token;
 	}
 
+	public String getPassword() {
+		return password;
+	}
+
+	public void setPassword(String password) {
+		this.password = password;
+	}
+
 	public UserStatus getStatus() {
 		return status;
 	}
 
 	public void setStatus(UserStatus status) {
 		this.status = status;
+	}
+
+	public UserRole getRole() {
+		return role;
+	}
+
+	public void setRole(UserRole role) {
+		this.role = role;
 	}
 }

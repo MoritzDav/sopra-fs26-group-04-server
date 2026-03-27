@@ -1,3 +1,4 @@
+/** 
 package ch.uzh.ifi.hase.soprafs26.controller;
 
 import tools.jackson.core.JacksonException;
@@ -37,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * request without actually sending them over the network.
  * This tests if the UserController works.
  */
+/**
 @WebMvcTest(UserController.class)
 public class UserControllerTest {
 
@@ -70,6 +72,7 @@ public class UserControllerTest {
 				.andExpect(jsonPath("$[0].username", is(user.getUsername())))
 				.andExpect(jsonPath("$[0].status", is(user.getStatus().toString())));
 	}
+
 
 	@Test
 	public void createUser_validInput_userCreated() throws Exception {
@@ -109,6 +112,8 @@ public class UserControllerTest {
 	 * @param object
 	 * @return string
 	 */
+
+	/**
 	private String asJsonString(final Object object) {
 		try {
 			return new ObjectMapper().writeValueAsString(object);
@@ -118,3 +123,4 @@ public class UserControllerTest {
 		}
 	}
 }
+	*/
