@@ -42,7 +42,7 @@ public class UserService {
 		newUser.setToken(UUID.randomUUID().toString());
 		
 		//We need to fix whether we need UserStatus and if we need to be automatically online
-		newUser.setStatus(UserStatus.OFFLINE);
+		newUser.setStatus(UserStatus.ONLINE);
 
 		checkIfUserExists(newUser);
 		// saves the given entity but data is only persisted in the database once
@@ -64,18 +64,11 @@ public class UserService {
 	 * @throws org.springframework.web.server.ResponseStatusException
 	 * @see User
 	 */
-	private void checkIfUserExists(User userToBeCreated) {
-		User userByUsername = userRepository.findByUsername(userToBeCreated.getUsername());
-		User userByLastName = userRepository.findByLastName(userToBeCreated.getLastName());
+    private void checkIfUserExists(User userToBeCreated) {
+        User userByUsername = userRepository.findByUsername(userToBeCreated.getUsername());
+        if (userByUsername != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists!");
+        }
+    }
 
-		String baseErrorMessage = "The %s provided %s not unique. Therefore, the user could not be created!";
-		if (userByUsername != null && userByLastName != null) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-					String.format(baseErrorMessage, "username and the name", "are"));
-		} else if (userByUsername != null) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(baseErrorMessage, "username", "is"));
-		} else if (userByLastName != null) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(baseErrorMessage, "name", "is"));
-		}
-	}
 }
