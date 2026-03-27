@@ -29,10 +29,11 @@ public interface DTOMapper {
 	@Mapping(source = "firstName", target = "firstName")
 	@Mapping(source = "lastName", target = "lastName")
 	@Mapping(source = "username", target = "username")
+	@Mapping(source = "password", target = "password")
 	@Mapping(target = "role", expression = "java(mapRole(userPostDTO.getRole()))")
 	User convertUserPostDTOtoEntity(UserPostDTO userPostDTO);
 
-	//Helper function to deal with the mapping of Role input is a String and Output the enumeration type
+	//Helper function to deal with the mapping of Role input as a String and output as enumeration type
 	default UserRole mapRole(String role){
 		if (role == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Role cannot be null");
 		role = role.trim().toUpperCase();

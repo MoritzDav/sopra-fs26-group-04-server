@@ -39,6 +39,9 @@ public class User implements Serializable {
 	@Column(nullable = false, unique = true)
 	private String token;
 
+	@Column(nullable = false, unique = true)
+	private String password;
+
 	@Column(nullable = false)
 	private UserStatus status;
 
@@ -83,6 +86,14 @@ public class User implements Serializable {
 
 	public void setToken(String token) {
 		this.token = token;
+	}
+
+	public String getPassword() {
+		return password;
+	}
+
+	public void setPassword(String password) {
+		this.password = password;
 	}
 
 	public UserStatus getStatus() {
