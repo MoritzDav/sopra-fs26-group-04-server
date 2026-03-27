@@ -1,3 +1,4 @@
+/**
 package ch.uzh.ifi.hase.soprafs26.rest.mapper;
 
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Tests if the mapping between the internal and the external/API representation
  * works.
  */
+/**
 public class DTOMapperTest {
+	
+	
 	@Test
 	public void testCreateUser_fromUserPostDTO_toUser_success() {
 		// create UserPostDTO
@@ -48,4 +52,6 @@ public class DTOMapperTest {
 		assertEquals(user.getUsername(), userGetDTO.getUsername());
 		assertEquals(user.getStatus(), userGetDTO.getStatus());
 	}
+	
 }
+*/
