@@ -15,8 +15,14 @@ import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 
+import java.util.Random;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+import java.io.ByteArrayOutputStream;
 
-
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @Transactional
@@ -26,6 +32,12 @@ public class CourseService {
 
 	private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    
+    private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final int CODE_LENGTH = 6;
+
+    @Value("${app.base-url:http://localhost:8080}")
+    private String baseUrl;
 
 	public CourseService(@Qualifier("courseRepository") CourseRepository courseRepository, @Qualifier("userRepository") UserRepository userRepository) {
 		this.courseRepository = courseRepository;
@@ -44,7 +56,7 @@ public class CourseService {
         
         newCourse.setTeacher(teacher);
 
-        newCourse.setCourseCode("abcdef");
+        newCourse.setCourseCode(generateUniqueCourseCode());
 
         newCourse = courseRepository.save(newCourse);
         userRepository.flush();
@@ -53,5 +65,57 @@ public class CourseService {
         return newCourse;
     }
 
+   
+    private String generateUniqueCourseCode() {
+        String courseCode;
+        boolean isUnique;
+
+        do {
+            courseCode = generateRandomCode();
+            isUnique = courseRepository.findByCourseCode(courseCode) == null;
+        } while (!isUnique);
+
+        return courseCode;
+    }
+
+   
+    private String generateRandomCode() {
+        Random random = new Random();
+        StringBuilder code = new StringBuilder();
+
+        for (int i = 0; i < CODE_LENGTH; i++) {
+            code.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
+        }
+
+        return code.toString();
+    }
+
+    // Retrieves a course by its ID from the database.
+    public Course getCourseById(Long courseId) {
+        return courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+    }
+
+    // Generates a QR code for the given course that redirects to the course page.
+    public byte[] generateQRCode(Course course) {
+        try {
+            // Create a URL that points to the course page
+            String courseUrl = String.format(
+                "%s/courses/%d",
+                baseUrl,
+                course.getId()
+            );
+
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix bitMatrix = qrCodeWriter.encode(courseUrl, BarcodeFormat.QR_CODE, 300, 300);
+            
+            ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
+            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
+            
+            return pngOutputStream.toByteArray();
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate QR code: " + e.getMessage());
+        }
+    }
 
 }

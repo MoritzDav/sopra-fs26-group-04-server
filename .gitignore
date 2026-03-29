@@ -1,5 +1,9 @@
 *.class
 
+# PNG images (generated QR codes)
+*.png
+
+
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 

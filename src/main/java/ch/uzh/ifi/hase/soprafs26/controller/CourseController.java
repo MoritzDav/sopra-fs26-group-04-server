@@ -1,6 +1,7 @@
 package ch.uzh.ifi.hase.soprafs26.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
@@ -30,5 +31,13 @@ public class CourseController {
         Course createdCourse = courseService.newCourse(courseInput, coursePostDTO.getTeacherId());
 
         return DTOMapper.INSTANCE.convertEntitiytoCourseGetDTO(createdCourse);
+    }
+
+    // Generates and returns a QR code image for a course.
+    @GetMapping("/courses/{courseId}/qr")
+    @ResponseStatus(HttpStatus.OK)
+    public byte[] getQRCode(@PathVariable Long courseId) {
+        Course course = courseService.getCourseById(courseId);
+        return courseService.generateQRCode(course);
     }
 }
