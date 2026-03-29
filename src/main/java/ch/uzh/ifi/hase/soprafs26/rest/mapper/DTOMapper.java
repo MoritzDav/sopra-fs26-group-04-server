@@ -5,10 +5,13 @@ import org.mapstruct.factory.Mappers;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.constant.*;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserAuthDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPostDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
 
 /**
  * DTOMapper
@@ -53,4 +56,22 @@ public interface DTOMapper {
 	@Mapping(source = "status", target = "status")
 	@Mapping(source = "role", target = "role")	
 	UserAuthDTO convertEntitytoUserAuthDTO(User user);
+
+
+	@Mapping(source = "title", target = "title")
+	@Mapping(source = "description", target = "description")
+	@Mapping(source = "pictureURL", target = "pictureURL")
+	@Mapping(target = "teacher", ignore = true)
+	@Mapping(target = "courseCode", ignore = true) 
+	Course convertCoursePostDTOtoEntity(CoursePostDTO coursePostDTO);
+
+
+
+	@Mapping(source = "id", target = "id")
+	@Mapping(source = "title", target = "title")
+	@Mapping(source = "description", target = "description")
+	@Mapping(source = "pictureURL", target = "pictureURL")
+	@Mapping(source = "courseCode", target = "courseCode")
+	@Mapping(source = "teacher.id", target = "teacherId")
+	CourseGetDTO convertEntitiytoCourseGetDTO(Course course);
 }
