@@ -5,19 +5,25 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
+import ch.uzh.ifi.hase.soprafs26.entity.CourseEnrollment;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
 import ch.uzh.ifi.hase.soprafs26.service.CourseService;
+import ch.uzh.ifi.hase.soprafs26.service.CourseEnrollmentService;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
+
+import java.util.List;
 
 
 @RestController
 public class CourseController {
     
     private final CourseService courseService;
+    private final CourseEnrollmentService courseEnrollmentService;
 
-	CourseController(CourseService courseService) {
+	CourseController(CourseService courseService, CourseEnrollmentService courseEnrollmentService) {
 		this.courseService = courseService;
+		this.courseEnrollmentService = courseEnrollmentService;
 	}
 
 
@@ -39,5 +45,23 @@ public class CourseController {
     public byte[] getQRCode(@PathVariable Long courseId) {
         Course course = courseService.getCourseById(courseId);
         return courseService.generateQRCode(course);
+    }
+
+    // Enrolls a student in a course using course code.
+    @PostMapping("/courses/{courseCode}/enroll")
+    @ResponseStatus(HttpStatus.CREATED)
+    @ResponseBody
+    public CourseEnrollment enrollStudent(@PathVariable String courseCode, @RequestParam Long studentId) {
+        return courseEnrollmentService.enrollStudentByCourseCode(studentId, courseCode);
+    }
+
+    // Gets all students enrolled in a course.
+    @GetMapping("/courses/{courseCode}/students")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public List<CourseEnrollment> getStudentsInCourse(@PathVariable String courseCode) {
+        // Get course by code to verify it exists and get the ID
+        Course course = courseService.getCourseByCourseCode(courseCode);
+        return courseEnrollmentService.getStudentsInCourse(course.getId());
     }
 }

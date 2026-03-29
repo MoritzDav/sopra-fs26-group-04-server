@@ -96,6 +96,15 @@ public class CourseService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
     }
 
+    // Retrieves a course by its course code from the database.
+    public Course getCourseByCourseCode(String courseCode) {
+        Course course = courseRepository.findByCourseCode(courseCode);
+        if (course == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Course code not found");
+        }
+        return course;
+    }
+
     // Generates a QR code for the given course that redirects to the course page.
     public byte[] generateQRCode(Course course) {
         try {
