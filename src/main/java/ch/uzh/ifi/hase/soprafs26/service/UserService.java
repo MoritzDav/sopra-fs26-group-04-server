@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
+import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 
@@ -43,6 +44,11 @@ public class UserService {
 		
 		//We need to fix whether we need UserStatus and if we need to be automatically online
 		newUser.setStatus(UserStatus.ONLINE);
+
+		// Set default role to STUDENT if not provided
+		if (newUser.getRole() == null) {
+			newUser.setRole(UserRole.STUDENT);
+		}
 
 		checkIfUserExists(newUser);
 		// saves the given entity but data is only persisted in the database once

@@ -38,4 +38,5 @@ public class UserController {
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(createdUser);
 	}
+
 }
