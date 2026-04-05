@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.*;
 
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserAuthDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.UserLoginDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 import ch.uzh.ifi.hase.soprafs26.service.UserService;
@@ -48,6 +49,28 @@ public class UserController {
 		
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(createdUser);
+	}
+
+	@PostMapping("/users/login")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public UserAuthDTO loginUser(@RequestBody UserLoginDTO userLoginDTO) {
+		// login user with username and password
+		User loggedInUser = userService.loginUser(userLoginDTO.getUsername(), userLoginDTO.getPassword());
+		
+		// convert internal representation of user back to API
+		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(loggedInUser);
+	}
+
+	@PostMapping("/users/{id}/logout")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public UserAuthDTO logoutUser(@PathVariable Long id, @RequestParam Long requestingUserId) {
+		// logout user with ownership check
+		User loggedOutUser = userService.logoutUser(id, requestingUserId);
+		
+		// convert internal representation of user back to API
+		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(loggedOutUser);
 	}
 
 }
