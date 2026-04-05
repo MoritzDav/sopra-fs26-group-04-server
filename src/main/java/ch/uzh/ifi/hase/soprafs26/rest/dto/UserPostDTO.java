@@ -48,5 +48,4 @@ public class UserPostDTO {
 	public void setRole(String role) {
 		this.role = role;
 	}
-
 }
