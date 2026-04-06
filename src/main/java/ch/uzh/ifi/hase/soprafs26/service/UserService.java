@@ -39,6 +39,48 @@ public class UserService {
 		return this.userRepository.findAll();
 	}
 
+	public User getUserById(Long id) {
+		return userRepository.findById(id)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+	}
+
+	public User loginUser(String username, String password) {
+		User user = userRepository.findByUsername(username);
+		
+		if (user == null) {
+			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
+		}
+		
+		// Simple password validation (not hashed - for testing only)
+		if (!user.getPassword().equals(password)) {
+			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
+		}
+		
+		// Set status to ONLINE
+		user.setStatus(UserStatus.ONLINE);
+		user = userRepository.save(user);
+		userRepository.flush();
+		
+		log.debug("User {} logged in", username);
+		return user;
+	}
+
+	public User logoutUser(Long id, Long requestingUserId) {
+		// Check ownership: only the user can logout themselves
+		if (!id.equals(requestingUserId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only logout your own account");
+		}
+		
+		User user = userRepository.findById(id)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+		
+		user.setStatus(UserStatus.OFFLINE);
+		user = userRepository.save(user);
+		userRepository.flush();
+		
+		log.debug("User {} logged out", id);
+		return user;
+	}
 	public User createUser(User newUser) {
 		newUser.setToken(UUID.randomUUID().toString());
 		

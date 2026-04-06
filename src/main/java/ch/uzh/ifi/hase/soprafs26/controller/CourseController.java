@@ -10,6 +10,7 @@ import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
 import ch.uzh.ifi.hase.soprafs26.service.CourseService;
 import ch.uzh.ifi.hase.soprafs26.service.CourseEnrollmentService;
+import ch.uzh.ifi.hase.soprafs26.service.OutlookService;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 
 import java.util.List;
@@ -20,12 +21,22 @@ public class CourseController {
     
     private final CourseService courseService;
     private final CourseEnrollmentService courseEnrollmentService;
+    private final OutlookService outlookService;
 
-	CourseController(CourseService courseService, CourseEnrollmentService courseEnrollmentService) {
+	CourseController(CourseService courseService, CourseEnrollmentService courseEnrollmentService, OutlookService outlookService) {
 		this.courseService = courseService;
 		this.courseEnrollmentService = courseEnrollmentService;
+		this.outlookService = outlookService;
 	}
 
+
+	@GetMapping("/courses/{courseId}")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public CourseGetDTO getCourse(@PathVariable Long courseId) {
+		Course course = courseService.getCourseById(courseId);
+		return DTOMapper.INSTANCE.convertEntitiytoCourseGetDTO(course);
+	}
 
 	@PostMapping("/courses")
 	@ResponseStatus(HttpStatus.CREATED)
@@ -45,6 +56,15 @@ public class CourseController {
     public byte[] getQRCode(@PathVariable Long courseId) {
         Course course = courseService.getCourseById(courseId);
         return courseService.generateQRCode(course);
+    }
+
+    // Generates/previews a course invitation email (similar to QR code generation).
+    @GetMapping("/courses/{courseId}/email")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public String generateCourseEmail(@PathVariable Long courseId) {
+        Course course = courseService.getCourseById(courseId);
+        return outlookService.generateCourseEmailPreview(course);
     }
 
     // Enrolls a student in a course using course code.
