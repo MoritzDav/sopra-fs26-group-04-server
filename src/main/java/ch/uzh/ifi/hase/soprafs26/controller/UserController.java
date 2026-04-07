@@ -1,5 +1,6 @@
 package ch.uzh.ifi.hase.soprafs26.controller;
 
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,7 +33,7 @@ public class UserController {
 	public UserAuthDTO getUser(@PathVariable Long id) {
 		// get user by id
 		User user = userService.getUserById(id);
-		
+
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(user);
 	}
@@ -40,13 +41,13 @@ public class UserController {
 	@PostMapping("/users")
 	@ResponseStatus(HttpStatus.CREATED)
 	@ResponseBody
-	public UserAuthDTO createUser(@RequestBody UserPostDTO userPostDTO) {
+	public UserAuthDTO createUser(@Valid @RequestBody UserPostDTO userPostDTO) {
 		// convert API user to internal representation
 		User userInput = DTOMapper.INSTANCE.convertUserPostDTOtoEntity(userPostDTO);
 
 		// create user
 		User createdUser = userService.createUser(userInput);
-		
+
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(createdUser);
 	}
@@ -57,7 +58,7 @@ public class UserController {
 	public UserAuthDTO loginUser(@RequestBody UserLoginDTO userLoginDTO) {
 		// login user with username and password
 		User loggedInUser = userService.loginUser(userLoginDTO.getUsername(), userLoginDTO.getPassword());
-		
+
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(loggedInUser);
 	}
@@ -68,7 +69,7 @@ public class UserController {
 	public UserAuthDTO logoutUser(@PathVariable Long id, @RequestParam Long requestingUserId) {
 		// logout user with ownership check
 		User loggedOutUser = userService.logoutUser(id, requestingUserId);
-		
+
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(loggedOutUser);
 	}
