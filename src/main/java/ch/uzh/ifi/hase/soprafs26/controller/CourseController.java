@@ -66,8 +66,8 @@ public class CourseController {
     @ResponseBody
     public void deleteCourse(@PathVariable Long courseId,
         @RequestHeader ("Authorization") String token) {
-            courseService.deleteCourse(courseId, token);
-        }
+        courseService.deleteCourse(courseId, token);
+    }
 
     // Generates and returns a QR code image for a course.
     @GetMapping("/courses/{courseId}/qr")

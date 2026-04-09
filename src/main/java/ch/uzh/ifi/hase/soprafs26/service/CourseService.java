@@ -172,6 +172,4 @@ public class CourseService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate QR code: " + e.getMessage());
         }
     }
-
-
 }
