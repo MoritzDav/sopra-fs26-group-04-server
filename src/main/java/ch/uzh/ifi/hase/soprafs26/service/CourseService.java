@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
@@ -59,12 +60,56 @@ public class CourseService {
         newCourse.setCourseCode(generateUniqueCourseCode());
 
         newCourse = courseRepository.save(newCourse);
-        userRepository.flush();
+        courseRepository.flush();
 
         log.debug("Created Information for Course: {}", newCourse);
         return newCourse;
     }
 
+    //Update course credentials i.e. title, description, picture
+    public void updateCourse(Long courseId, String token, CoursePutDTO coursePutDTO){
+    
+        //Fetch the requesting user from the DB
+        User requestingUser = userRepository.findByToken(token).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
+    
+        //Fetch the respective Course from the DB
+        Course course = courseRepository.findById(courseId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        //See if requesting user matches course teacher
+        if (!course.getTeacher().getId().equals(requestingUser.getId())){
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of the course");
+        }
+
+        //Change the respecting fields if they exist in the DTO
+        if (coursePutDTO.getTitle() != null) course.setTitle(coursePutDTO.getTitle());
+        if (coursePutDTO.getDescription() != null) course.setDescription(coursePutDTO.getDescription());
+        if (coursePutDTO.getPictureURL() != null) course.setPictureURL(coursePutDTO.getPictureURL());  
+
+        course = courseRepository.save(course);
+        courseRepository.flush();
+
+        log.debug("Updated course informations for Course: {}", course);    
+    }
+
+    //Delete a course as the corresponding teacher
+    public void deleteCourse(Long courseId, String token){
+        
+        //Fetch the requesting user from the DB
+        User requestingUser = userRepository.findByToken(token).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
+
+        //Fetch the respective Course from the DB
+        Course course = courseRepository.findById(courseId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        //See if requesting user matches course teacher
+        if (!course.getTeacher().getId().equals(requestingUser.getId())){
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of the course");
+        }
+
+        courseRepository.delete(course);
+
+        log.debug("Deletec course: {}", course);    
+    
+    }
    
     private String generateUniqueCourseCode() {
         String courseCode;
@@ -89,6 +134,7 @@ public class CourseService {
 
         return code.toString();
     }
+
 
     // Retrieves a course by its ID from the database.
     public Course getCourseById(Long courseId) {
@@ -126,5 +172,6 @@ public class CourseService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate QR code: " + e.getMessage());
         }
     }
+
 
 }

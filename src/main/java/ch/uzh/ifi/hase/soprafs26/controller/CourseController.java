@@ -8,6 +8,7 @@ import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.CourseEnrollment;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import ch.uzh.ifi.hase.soprafs26.service.CourseService;
 import ch.uzh.ifi.hase.soprafs26.service.CourseEnrollmentService;
 import ch.uzh.ifi.hase.soprafs26.service.OutlookService;
@@ -30,7 +31,18 @@ public class CourseController {
 	}
 
 
-	@GetMapping("/courses/{courseId}")
+    //Creates a new course
+	@PostMapping("/courses")
+	@ResponseStatus(HttpStatus.CREATED)
+	@ResponseBody
+	public CourseGetDTO createCourse(@RequestBody CoursePostDTO coursePostDTO) {
+        Course courseInput = DTOMapper.INSTANCE.convertCoursePostDTOtoEntity(coursePostDTO);
+        Course createdCourse = courseService.newCourse(courseInput, coursePostDTO.getTeacherId());
+        return DTOMapper.INSTANCE.convertEntitiytoCourseGetDTO(createdCourse);
+    }
+
+    //Gets information of a course
+    @GetMapping("/courses/{courseId}")
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
 	public CourseGetDTO getCourse(@PathVariable Long courseId) {
@@ -38,17 +50,24 @@ public class CourseController {
 		return DTOMapper.INSTANCE.convertEntitiytoCourseGetDTO(course);
 	}
 
-	@PostMapping("/courses")
-	@ResponseStatus(HttpStatus.CREATED)
-	@ResponseBody
-	public CourseGetDTO createCourse(@RequestBody CoursePostDTO coursePostDTO) {
-
-        Course courseInput = DTOMapper.INSTANCE.convertCoursePostDTOtoEntity(coursePostDTO);
-
-        Course createdCourse = courseService.newCourse(courseInput, coursePostDTO.getTeacherId());
-
-        return DTOMapper.INSTANCE.convertEntitiytoCourseGetDTO(createdCourse);
+    //Changes credentials of a course
+    @PutMapping("/courses/{courseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ResponseBody
+    public void updateCourse(@PathVariable Long courseId, 
+        @RequestHeader ("Authorization") String token,
+        @RequestBody CoursePutDTO coursePutDTO) {
+        courseService.updateCourse(courseId, token, coursePutDTO);
     }
+
+    //Deletes a course
+    @DeleteMapping("/courses/{courseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ResponseBody
+    public void deleteCourse(@PathVariable Long courseId,
+        @RequestHeader ("Authorization") String token) {
+            courseService.deleteCourse(courseId, token);
+        }
 
     // Generates and returns a QR code image for a course.
     @GetMapping("/courses/{courseId}/qr")
