@@ -5,6 +5,8 @@ import org.springframework.stereotype.Repository;
 
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 
+import java.util.Optional;
+
 @Repository("userRepository")
 public interface UserRepository extends JpaRepository<User, Long> {
 	User findByFirstName(String firstName);
@@ -12,4 +14,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	User findByLastName(String lastName);
 
 	User findByUsername(String username);
+
+	Optional<User> findByToken(String token);
 }
