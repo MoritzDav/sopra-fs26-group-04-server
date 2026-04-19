@@ -41,10 +41,8 @@ public class SessionService {
     public Session startSession(Long courseId, String token, Session sessionInput){
 
         //Validate token of user, that creates the session
-        User user = userRepository.findByToken(token);
-        if (user == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token");
-        }
+        User user = userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
         
         //Check whether user is actually a teacher
         if (user.getRole() != UserRole.TEACHER){
@@ -99,10 +97,8 @@ public class SessionService {
     public void endSession(Long sessionId, String token){
 
         //Validate user via token
-        User user = userRepository.findByToken(token);
-        if (user == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token");
-        }
+        User user = userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
 
         //Check if user is a teacher
         if (user.getRole() != UserRole.TEACHER) {
