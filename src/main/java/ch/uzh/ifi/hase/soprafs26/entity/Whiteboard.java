@@ -68,4 +68,9 @@ public abstract class Whiteboard implements Serializable{
     public void setPages(List<WhiteboardPage> pages) {
         this.pages = pages;
     }
+
+    public void addPage(WhiteboardPage page){
+        this.pages.add(page);
+        page.setWhiteboard(this);
+    }
 }

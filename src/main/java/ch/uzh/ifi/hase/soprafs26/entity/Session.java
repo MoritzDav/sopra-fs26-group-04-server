@@ -22,7 +22,7 @@ public class Session implements Serializable{
     private String title;
 
     @Column(nullable = false)
-    private boolean active;
+    private Boolean active;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

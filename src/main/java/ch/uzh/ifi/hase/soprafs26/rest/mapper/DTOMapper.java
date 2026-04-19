@@ -7,11 +7,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.entity.Session;
 import ch.uzh.ifi.hase.soprafs26.constant.*;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserAuthDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionGetDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
 
 /**
  * DTOMapper
@@ -74,4 +77,25 @@ public interface DTOMapper {
 	@Mapping(source = "courseCode", target = "courseCode")
 	@Mapping(source = "teacher.id", target = "teacherId")
 	CourseGetDTO convertEntitiytoCourseGetDTO(Course course);
+
+
+
+	//Session mappings
+
+	@Mapping(source = "title", target = "title")
+	@Mapping(target = "mode", ignore = true)
+	@Mapping(target = "course", ignore = true)
+	Session convertSessionPostDTOtoEntity(SessionPostDTO sessionPostDTO);
+
+	@Mapping(source = "sessionId", target = "sessionId")
+	@Mapping(source = "title", target = "title")
+	@Mapping(source = "active", target = "active")
+	@Mapping(source = "createdAt", target = "createdAt")
+	@Mapping(source = "start", target = "start")
+	@Mapping(source = "mode", target = "mode")
+	@Mapping(source = "course.id", target = "courseId")
+	@Mapping(source = "teacherWhiteboard.whiteboardId", target = "teacherWhiteboardId")
+	@Mapping(source = "selectedWhiteboard.whiteboardId", target = "selectedWhiteboardId")
+	SessionGetDTO convertSessionEntityToSessionGetDTO(Session session);
+	
 }

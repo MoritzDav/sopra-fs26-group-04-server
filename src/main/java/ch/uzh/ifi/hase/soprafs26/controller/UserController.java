@@ -42,6 +42,7 @@ public class UserController {
 	@ResponseStatus(HttpStatus.CREATED)
 	@ResponseBody
 	public UserAuthDTO createUser(@Valid @RequestBody UserPostDTO userPostDTO) {
+		
 		// convert API user to internal representation
 		User userInput = DTOMapper.INSTANCE.convertUserPostDTOtoEntity(userPostDTO);
 
