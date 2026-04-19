@@ -8,6 +8,7 @@ import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserAuthDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserLoginDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPostDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPutDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 import ch.uzh.ifi.hase.soprafs26.service.UserService;
 
@@ -61,6 +62,14 @@ public class UserController {
 
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(loggedInUser);
+	}
+
+	@PutMapping("/users/{id}")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public UserAuthDTO updateUser(@PathVariable Long id, @RequestBody UserPutDTO userPutDTO) {
+		User updatedUser = userService.updateUser(id, userPutDTO);
+		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(updatedUser);
 	}
 
 	@PostMapping("/users/{id}/logout")
