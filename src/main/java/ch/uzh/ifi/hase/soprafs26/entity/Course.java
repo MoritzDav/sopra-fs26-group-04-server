@@ -80,5 +80,5 @@ public class Course implements Serializable {
 	public void setTeacher(User teacher) {
 		this.teacher = teacher;
 	}
-
+	
 }
