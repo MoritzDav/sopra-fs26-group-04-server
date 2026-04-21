@@ -17,7 +17,6 @@ import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 
 import java.util.Random;
-import java.util.Optional;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
