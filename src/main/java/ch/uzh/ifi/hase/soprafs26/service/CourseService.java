@@ -17,6 +17,7 @@ import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 
 import java.util.Random;
+import java.util.Optional;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
@@ -70,7 +71,8 @@ public class CourseService {
     public void updateCourse(Long courseId, String token, CoursePutDTO coursePutDTO){
     
         //Fetch the requesting user from the DB
-        User requestingUser = userRepository.findByToken(token).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
+        User requestingUser = userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
     
         //Fetch the respective Course from the DB
         Course course = courseRepository.findById(courseId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));

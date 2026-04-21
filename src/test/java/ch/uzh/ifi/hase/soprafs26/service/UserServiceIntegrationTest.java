@@ -296,5 +296,176 @@ public class UserServiceIntegrationTest {
 				() -> userService.loginUser("testuser2", "wrongpassword"));
 	}
 
+	// ============ Session Management Tests ============
+
+	@Test
+	public void tokenGeneration_createsUniqueUUIDToken() {
+		// given
+		User user = new User();
+		user.setFirstName("Token");
+		user.setLastName("Test");
+		user.setUsername("tokentest");
+		user.setPassword("password123");
+
+		// when
+		User createdUser = userService.createUser(user);
+
+		// then
+		assertNotNull(createdUser.getToken());
+		// UUID format: 8-4-4-4-12 hex digits
+		assertTrue(createdUser.getToken().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"));
+	}
+
+	@Test
+	public void multipleUsers_haveUniqueTokens() {
+		// given
+		User user1 = new User();
+		user1.setFirstName("User");
+		user1.setLastName("One");
+		user1.setUsername("unique_user1");
+		user1.setPassword("pass1");
+
+		User user2 = new User();
+		user2.setFirstName("User");
+		user2.setLastName("Two");
+		user2.setUsername("unique_user2");
+		user2.setPassword("pass2");
+
+		// when
+		User created1 = userService.createUser(user1);
+		User created2 = userService.createUser(user2);
+
+		// then
+		assertNotEquals(created1.getToken(), created2.getToken());
+		assertNotNull(created1.getToken());
+		assertNotNull(created2.getToken());
+	}
+
+	@Test
+	public void loginUser_tokenRemainsSame() {
+		// given
+		User testUser = new User();
+		testUser.setFirstName("Login");
+		testUser.setLastName("Token");
+		testUser.setUsername("logintokentest");
+		testUser.setPassword("password123");
+
+		User createdUser = userService.createUser(testUser);
+		String originalToken = createdUser.getToken();
+
+		// Logout to set OFFLINE
+		userService.logoutUser(createdUser.getId(), createdUser.getId());
+
+		// when
+		User loggedInUser = userService.loginUser("logintokentest", "password123");
+
+		// then
+		assertEquals(originalToken, loggedInUser.getToken());
+	}
+
+	@Test
+	public void logoutUser_tokenRemainsSame() {
+		// given
+		User testUser = new User();
+		testUser.setFirstName("Logout");
+		testUser.setLastName("Token");
+		testUser.setUsername("logouttokentest");
+		testUser.setPassword("password123");
+
+		User createdUser = userService.createUser(testUser);
+		String originalToken = createdUser.getToken();
+
+		// when
+		User loggedOutUser = userService.logoutUser(createdUser.getId(), createdUser.getId());
+
+		// then
+		assertEquals(originalToken, loggedOutUser.getToken());
+	}
+
+	@Test
+	public void loginUser_statusChangesPersistsWithToken() {
+		// given
+		User testUser = new User();
+		testUser.setFirstName("Status");
+		testUser.setLastName("Change");
+		testUser.setUsername("statuschangetest");
+		testUser.setPassword("password123");
+
+		User createdUser = userService.createUser(testUser);
+		assertEquals(UserStatus.ONLINE, createdUser.getStatus());
+		String token = createdUser.getToken();
+
+		// Logout
+		userService.logoutUser(createdUser.getId(), createdUser.getId());
+		User offlineUser = userService.getUserById(createdUser.getId());
+		assertEquals(UserStatus.OFFLINE, offlineUser.getStatus());
+		assertEquals(token, offlineUser.getToken());
+
+		// when - Login again
+		User loggedInUser = userService.loginUser("statuschangetest", "password123");
+
+		// then
+		assertEquals(UserStatus.ONLINE, loggedInUser.getStatus());
+		assertEquals(token, loggedInUser.getToken());
+
+		// Verify in DB
+		User verifiedUser = userService.getUserById(createdUser.getId());
+		assertEquals(UserStatus.ONLINE, verifiedUser.getStatus());
+		assertEquals(token, verifiedUser.getToken());
+	}
+
+	@Test
+	public void concurrentSessions_samUserMultipleLogins() {
+		// given
+		User testUser = new User();
+		testUser.setFirstName("Concurrent");
+		testUser.setLastName("Session");
+		testUser.setUsername("concurrenttest");
+		testUser.setPassword("password123");
+
+		User createdUser = userService.createUser(testUser);
+		String token = createdUser.getToken();
+		Long userId = createdUser.getId();
+
+		// Logout first
+		userService.logoutUser(userId, userId);
+
+		// when - Login
+		User login1 = userService.loginUser("concurrenttest", "password123");
+		assertEquals(UserStatus.ONLINE, login1.getStatus());
+		assertEquals(token, login1.getToken());
+
+		// then - Token and user status should be consistent
+		User retrievedUser = userService.getUserById(userId);
+		assertEquals(UserStatus.ONLINE, retrievedUser.getStatus());
+		assertEquals(token, retrievedUser.getToken());
+	}
+
+	@Test
+	public void tokenRetrievalAfterLoginLogout() {
+		// given
+		User testUser = new User();
+		testUser.setFirstName("Retrieval");
+		testUser.setLastName("Test");
+		testUser.setUsername("retrievaltest");
+		testUser.setPassword("password123");
+
+		User createdUser = userService.createUser(testUser);
+		Long userId = createdUser.getId();
+		String token = createdUser.getToken();
+
+		// when
+		User retrievedBeforeLogout = userService.getUserById(userId);
+		userService.logoutUser(userId, userId);
+		User retrievedAfterLogout = userService.getUserById(userId);
+		userService.loginUser("retrievaltest", "password123");
+		User retrievedAfterLogin = userService.getUserById(userId);
+
+		// then
+		assertEquals(token, retrievedBeforeLogout.getToken());
+		assertEquals(token, retrievedAfterLogout.getToken());
+		assertEquals(token, retrievedAfterLogin.getToken());
+	}
+
 }
 

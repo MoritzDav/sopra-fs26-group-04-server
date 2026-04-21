@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * CourseEnrollmentServiceTest
- *
+ * 
  * Unit tests for course enrollment functionality (join course).
  * Tests verify student enrollment in courses with Mockito mocking.
  */
