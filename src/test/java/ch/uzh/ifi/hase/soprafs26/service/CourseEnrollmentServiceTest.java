@@ -61,6 +61,7 @@ public class CourseEnrollmentServiceTest {
 		testStudent.setUsername("johndoe");
 		testStudent.setPassword("password123");
 		testStudent.setRole(UserRole.STUDENT);
+		testStudent.setToken("student-token");
 
 		// Create test teacher
 		testTeacher = new User();
@@ -70,6 +71,7 @@ public class CourseEnrollmentServiceTest {
 		testTeacher.setUsername("prof_smith");
 		testTeacher.setPassword("password123");
 		testTeacher.setRole(UserRole.TEACHER);
+		testTeacher.setToken("teacher-token");
 
 		// Create test course
 		testCourse = new Course();
@@ -91,13 +93,13 @@ public class CourseEnrollmentServiceTest {
 	@Test
 	public void enrollStudentByCourseCode_validStudent_success() {
 		// given
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testStudent));
+		Mockito.when(userRepository.findByToken("student-token")).thenReturn(Optional.of(testStudent));
 		Mockito.when(courseRepository.findByCourseCode("JAVA101")).thenReturn(testCourse);
 		Mockito.when(courseEnrollmentRepository.findByStudentIdAndCourseId(1L, 1L)).thenReturn(Optional.empty());
 		Mockito.when(courseEnrollmentRepository.save(Mockito.any())).thenReturn(testEnrollment);
 
 		// when
-		CourseEnrollment enrollment = courseEnrollmentService.enrollStudentByCourseCode(1L, "JAVA101");
+		CourseEnrollment enrollment = courseEnrollmentService.enrollStudentByCourseCode("student-token", "JAVA101");
 
 		// then
 		Mockito.verify(courseEnrollmentRepository, Mockito.times(1)).save(Mockito.any());
@@ -116,20 +118,20 @@ public class CourseEnrollmentServiceTest {
 
 		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(999L, "JAVA101"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode("student-token", "JAVA101"));
 
-		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-		assertTrue(exception.getReason().contains("Student not found"));
+		assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+		assertTrue(exception.getReason().contains("Invalid token"));
 	}
 
 	@Test
 	public void enrollStudentByCourseCode_teacherCannotEnroll_throwsException() {
 		// given
-		Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(testTeacher));
+		Mockito.when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(testTeacher));
 
 		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(2L, "JAVA101"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode("teacher-token", "JAVA101"));
 
 		assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
 		assertTrue(exception.getReason().contains("Only students can enroll"));
@@ -141,12 +143,12 @@ public class CourseEnrollmentServiceTest {
 	@Test
 	public void enrollStudentByCourseCode_courseNotFound_throwsException() {
 		// given
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testStudent));
+		Mockito.when(userRepository.findByToken("student-token")).thenReturn(Optional.of(testStudent));
 		Mockito.when(courseRepository.findByCourseCode("INVALID")).thenReturn(null);
 
 		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(1L, "INVALID"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode("student-token", "INVALID"));
 
 		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
 		assertTrue(exception.getReason().contains("Course code not found"));
@@ -158,14 +160,14 @@ public class CourseEnrollmentServiceTest {
 	@Test
 	public void enrollStudentByCourseCode_alreadyEnrolled_throwsException() {
 		// given
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testStudent));
+		Mockito.when(userRepository.findByToken("student-token")).thenReturn(Optional.of(testStudent));
 		Mockito.when(courseRepository.findByCourseCode("JAVA101")).thenReturn(testCourse);
 		Mockito.when(courseEnrollmentRepository.findByStudentIdAndCourseId(1L, 1L))
 				.thenReturn(Optional.of(testEnrollment));
 
 		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(1L, "JAVA101"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode("student-token", "JAVA101"));
 
 		assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
 		assertTrue(exception.getReason().contains("already enrolled"));
@@ -179,7 +181,7 @@ public class CourseEnrollmentServiceTest {
 		// given
 		LocalDateTime beforeEnrollment = LocalDateTime.now();
 		
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testStudent));
+		Mockito.when(userRepository.findByToken("student-token")).thenReturn(Optional.of(testStudent));
 		Mockito.when(courseRepository.findByCourseCode("JAVA101")).thenReturn(testCourse);
 		Mockito.when(courseEnrollmentRepository.findByStudentIdAndCourseId(1L, 1L)).thenReturn(Optional.empty());
 		
@@ -191,7 +193,7 @@ public class CourseEnrollmentServiceTest {
 		});
 
 		// when
-		CourseEnrollment enrollment = courseEnrollmentService.enrollStudentByCourseCode(1L, "JAVA101");
+		CourseEnrollment enrollment = courseEnrollmentService.enrollStudentByCourseCode("student-token", "JAVA101");
 
 		// then
 		assertNotNull(enrollment.getJoinedDate());
@@ -209,11 +211,11 @@ public class CourseEnrollmentServiceTest {
 		course2.setId(2L);
 		course2.setCourseCode("JAVA102");
 
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testStudent));
+		Mockito.when(userRepository.findByToken("student-token")).thenReturn(Optional.of(testStudent));
 		Mockito.when(courseRepository.findByCourseCode("JAVA101")).thenReturn(testCourse);
 		Mockito.when(courseEnrollmentRepository.findByStudentIdAndCourseId(1L, 1L)).thenReturn(Optional.empty());
 
-		Mockito.when(userRepository.findById(3L)).thenReturn(Optional.of(student2));
+		Mockito.when(userRepository.findByToken("student2-token")).thenReturn(Optional.of(student2));
 		Mockito.when(courseRepository.findByCourseCode("JAVA102")).thenReturn(course2);
 		Mockito.when(courseEnrollmentRepository.findByStudentIdAndCourseId(3L, 2L)).thenReturn(Optional.empty());
 
@@ -229,8 +231,8 @@ public class CourseEnrollmentServiceTest {
 		});
 
 		// when
-		CourseEnrollment result1 = courseEnrollmentService.enrollStudentByCourseCode(1L, "JAVA101");
-		CourseEnrollment result2 = courseEnrollmentService.enrollStudentByCourseCode(3L, "JAVA102");
+		CourseEnrollment result1 = courseEnrollmentService.enrollStudentByCourseCode("student-token", "JAVA101");
+		CourseEnrollment result2 = courseEnrollmentService.enrollStudentByCourseCode("student2-token", "JAVA102");
 
 		// then
 		assertNotEquals(result1.getId(), result2.getId());
@@ -244,11 +246,12 @@ public class CourseEnrollmentServiceTest {
 	public void getStudentsInCourse_validCourseId_success() {
 		// given
 		List<CourseEnrollment> enrollments = Arrays.asList(testEnrollment);
+		Mockito.when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(testTeacher));
 		Mockito.when(courseRepository.findById(1L)).thenReturn(Optional.of(testCourse));
 		Mockito.when(courseEnrollmentRepository.findByCourseId(1L)).thenReturn(enrollments);
 
 		// when
-		List<CourseEnrollment> result = courseEnrollmentService.getStudentsInCourse(1L);
+		List<CourseEnrollment> result = courseEnrollmentService.getStudentsInCourse(1L, "teacher-token");
 
 		// then
 		assertEquals(1, result.size());
@@ -258,11 +261,12 @@ public class CourseEnrollmentServiceTest {
 	@Test
 	public void getStudentsInCourse_courseNotFound_throwsException() {
 		// given
+		Mockito.when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(testTeacher));
 		Mockito.when(courseRepository.findById(999L)).thenReturn(Optional.empty());
 
 		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.getStudentsInCourse(999L));
+				() -> courseEnrollmentService.getStudentsInCourse(999L, "teacher-token"));
 
 		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
 		assertTrue(exception.getReason().contains("Course not found"));
@@ -271,11 +275,12 @@ public class CourseEnrollmentServiceTest {
 	@Test
 	public void getStudentsInCourse_emptyEnrollments() {
 		// given
+		Mockito.when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(testTeacher));
 		Mockito.when(courseRepository.findById(1L)).thenReturn(Optional.of(testCourse));
 		Mockito.when(courseEnrollmentRepository.findByCourseId(1L)).thenReturn(Arrays.asList());
 
 		// when
-		List<CourseEnrollment> result = courseEnrollmentService.getStudentsInCourse(1L);
+		List<CourseEnrollment> result = courseEnrollmentService.getStudentsInCourse(1L, "teacher-token");
 
 		// then
 		assertTrue(result.isEmpty());

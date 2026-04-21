@@ -51,11 +51,6 @@ public class UserService {
 		return this.userRepository.findAll();
 	}
 
-	public User getUserById(Long id) {
-		return userRepository.findById(id)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-	}
-
 	public User loginUser(String username, String password) {
 		User user = userRepository.findByUsername(username);
 		
@@ -68,7 +63,8 @@ public class UserService {
 			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
 		}
 		
-		// Set status to ONLINE
+		// Generate new token and set status to ONLINE
+		user.setToken(UUID.randomUUID().toString());
 		user.setStatus(UserStatus.ONLINE);
 		user = userRepository.save(user);
 		userRepository.flush();
@@ -77,20 +73,16 @@ public class UserService {
 		return user;
 	}
 
-	public User logoutUser(Long id, Long requestingUserId) {
-		// Check ownership: only the user can logout themselves
-		if (!id.equals(requestingUserId)) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only logout your own account");
-		}
+	public User logoutUser(String token) {
 		
-		User user = userRepository.findById(id)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+		//Fetch user via token
+		User user = getUserByToken(token);
 		
 		user.setStatus(UserStatus.OFFLINE);
 		user = userRepository.save(user);
 		userRepository.flush();
 		
-		log.debug("User {} logged out", id);
+		log.debug("User {} logged out", user.getId());
 		return user;
 	}
 	
@@ -150,8 +142,8 @@ public class UserService {
 
 	public List<Course> getCoursesByUser(Long id, String token) {
 
-		//Validate the token, no matching due to possible functionality
-		userRepository.findByToken(token).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+		//Validate the token, no matching due to possible functionality and fetching user via Id also because of functionality, teacher might want to see students courses
+		getUserByToken(token);
 		
 		//Fetch user
 		User user = userRepository.findById(id)
@@ -189,4 +181,18 @@ public class UserService {
         }
     }
 
+
+	//Helper functions for the checks
+
+    //Fetch user via token including validation
+    private User getUserByToken(String token){
+        return userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+    }
+
+	//Fetch user via Id
+	public User getUserById(Long id) {
+    return userRepository.findById(id)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+	}
 }

@@ -77,13 +77,14 @@ public class UserController {
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(updatedUser);
 	}
 
-	@PostMapping("/users/{id}/logout")
+	@PostMapping("/users/logout")
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public UserAuthDTO logoutUser(@PathVariable Long id, @RequestParam Long requestingUserId) {
+	public UserAuthDTO logoutUser(@RequestHeader("Authorization") String token) {
+		
 		// logout user with ownership check
-		User loggedOutUser = userService.logoutUser(id, requestingUserId);
-
+		User loggedOutUser = userService.logoutUser(token);
+		
 		// convert internal representation of user back to API
 		return DTOMapper.INSTANCE.convertEntitytoUserAuthDTO(loggedOutUser);
 	}

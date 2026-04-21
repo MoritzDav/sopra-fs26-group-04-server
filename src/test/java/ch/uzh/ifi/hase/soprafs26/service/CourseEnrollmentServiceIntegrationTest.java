@@ -84,7 +84,7 @@ public class CourseEnrollmentServiceIntegrationTest {
 
 		// when
 		CourseEnrollment enrollment = courseEnrollmentService.enrollStudentByCourseCode(
-				savedStudent.getId(), "JAVA101");
+				savedStudent.getToken(), "JAVA101");
 
 		// then
 		assertNotNull(enrollment.getId());
@@ -102,7 +102,7 @@ public class CourseEnrollmentServiceIntegrationTest {
 	public void enrollStudentByCourseCode_studentNotFound_throwsException() {
 		// given, when & then
 		assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(999L, "JAVA101"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode("invalid-token", "JAVA101"));
 	}
 
 	@Test
@@ -113,7 +113,7 @@ public class CourseEnrollmentServiceIntegrationTest {
 
 		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(savedTeacher.getId(), "JAVA101"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode(savedTeacher.getToken(), "JAVA101"));
 
 		assertEquals("403 FORBIDDEN \"Only students can enroll in courses\"", exception.getMessage());
 	}
@@ -126,7 +126,7 @@ public class CourseEnrollmentServiceIntegrationTest {
 
 		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getId(), "INVALID"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getToken(), "INVALID"));
 
 		assertEquals("404 NOT_FOUND \"Course code not found\"", exception.getMessage());
 	}
@@ -147,11 +147,11 @@ public class CourseEnrollmentServiceIntegrationTest {
 		User savedStudent = userRepository.save(student);
 
 		// Enroll first time
-		courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getId(), "JAVA101");
+		courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getToken(), "JAVA101");
 
 		// when & then - Try to enroll again
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getId(), "JAVA101"));
+				() -> courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getToken(), "JAVA101"));
 
 		assertEquals("409 CONFLICT \"Student is already enrolled in this course\"", exception.getMessage());
 	}
@@ -176,9 +176,9 @@ public class CourseEnrollmentServiceIntegrationTest {
 
 		// when
 		CourseEnrollment enrollment1 = courseEnrollmentService.enrollStudentByCourseCode(
-				savedStudent1.getId(), "JAVA101");
+				savedStudent1.getToken(), "JAVA101");
 		CourseEnrollment enrollment2 = courseEnrollmentService.enrollStudentByCourseCode(
-				savedStudent2.getId(), "JAVA101");
+				savedStudent2.getToken(), "JAVA101");
 
 		// then
 		assertNotNull(enrollment1.getId());
@@ -186,7 +186,7 @@ public class CourseEnrollmentServiceIntegrationTest {
 		assertNotEquals(enrollment1.getId(), enrollment2.getId());
 
 		// Verify both enrolled
-		List<CourseEnrollment> enrollments = courseEnrollmentService.getStudentsInCourse(savedCourse.getId());
+		List<CourseEnrollment> enrollments = courseEnrollmentService.getStudentsInCourse(savedCourse.getId(), savedTeacher.getToken());
 		assertEquals(2, enrollments.size());
 	}
 
@@ -213,9 +213,9 @@ public class CourseEnrollmentServiceIntegrationTest {
 
 		// when
 		CourseEnrollment enrollment1 = courseEnrollmentService.enrollStudentByCourseCode(
-				savedStudent.getId(), "JAVA101");
+				savedStudent.getToken(), "JAVA101");
 		CourseEnrollment enrollment2 = courseEnrollmentService.enrollStudentByCourseCode(
-				savedStudent.getId(), "JAVA102");
+				savedStudent.getToken(), "JAVA102");
 
 		// then
 		assertNotNull(enrollment1.getId());
@@ -246,11 +246,11 @@ public class CourseEnrollmentServiceIntegrationTest {
 		User savedStudent2 = userRepository.save(student2);
 
 		// when
-		courseEnrollmentService.enrollStudentByCourseCode(savedStudent1.getId(), "JAVA101");
-		courseEnrollmentService.enrollStudentByCourseCode(savedStudent2.getId(), "JAVA101");
+		courseEnrollmentService.enrollStudentByCourseCode(savedStudent1.getToken(), "JAVA101");
+		courseEnrollmentService.enrollStudentByCourseCode(savedStudent2.getToken(), "JAVA101");
 
 		// then
-		List<CourseEnrollment> enrollments = courseEnrollmentService.getStudentsInCourse(savedCourse.getId());
+		List<CourseEnrollment> enrollments = courseEnrollmentService.getStudentsInCourse(savedCourse.getId(), savedTeacher.getToken());
 		assertEquals(2, enrollments.size());
 
 		List<Long> studentIds = enrollments.stream().map(CourseEnrollment::getStudentId).toList();
@@ -280,8 +280,8 @@ public class CourseEnrollmentServiceIntegrationTest {
 		User savedStudent = userRepository.save(student);
 
 		// when
-		courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getId(), "JAVA101");
-		courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getId(), "JAVA102");
+		courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getToken(), "JAVA101");
+		courseEnrollmentService.enrollStudentByCourseCode(savedStudent.getToken(), "JAVA102");
 
 		// then
 		List<CourseEnrollment> enrollments = courseEnrollmentService.getStudentEnrollments(savedStudent.getId());
@@ -308,7 +308,7 @@ public class CourseEnrollmentServiceIntegrationTest {
 
 		// when
 		CourseEnrollment enrollment = courseEnrollmentService.enrollStudentByCourseCode(
-				savedStudent.getId(), "JAVA101");
+				savedStudent.getToken(), "JAVA101");
 
 		// then
 		assertNotNull(enrollment.getJoinedDate());
