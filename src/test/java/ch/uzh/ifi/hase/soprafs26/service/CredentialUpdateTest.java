@@ -5,6 +5,8 @@ import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
+import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
+import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -58,14 +60,24 @@ public class CredentialUpdateTest {
         // Setup teacher (course owner)
         teacher = new User();
         teacher.setId(1L);
+        teacher.setFirstName("Professor");
+        teacher.setLastName("Smith");
         teacher.setUsername("prof_smith");
         teacher.setToken("teacher-token-valid");
+        teacher.setPassword("secure_password_123");
+        teacher.setStatus(UserStatus.ONLINE);
+        teacher.setRole(UserRole.TEACHER);
 
         // Setup unauthorized user
         unauthorizedUser = new User();
         unauthorizedUser.setId(2L);
+        unauthorizedUser.setFirstName("Alice");
+        unauthorizedUser.setLastName("Student");
         unauthorizedUser.setUsername("student_alice");
         unauthorizedUser.setToken("student-token-invalid");
+        unauthorizedUser.setPassword("student_password_123");
+        unauthorizedUser.setStatus(UserStatus.ONLINE);
+        unauthorizedUser.setRole(UserRole.STUDENT);
 
         // Setup course
         course = new Course();
