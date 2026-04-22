@@ -7,6 +7,7 @@ import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.*;
  * - Authorization checks
  * - Validation of inputs
  */
+@Timeout(10) // 10 second timeout for unit tests
 public class CredentialUpdateTest {
 
     @Mock
