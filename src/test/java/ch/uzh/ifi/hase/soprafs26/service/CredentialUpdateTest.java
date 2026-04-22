@@ -9,7 +9,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -42,7 +41,6 @@ public class CredentialUpdateTest {
     @Mock
     private UserRepository userRepository;
 
-    @InjectMocks
     private CourseService courseService;
 
     private User teacher;
@@ -51,6 +49,9 @@ public class CredentialUpdateTest {
 
     @BeforeEach
     public void setup() {
+        // Manually instantiate CourseService with mocked repositories
+        courseService = new CourseService(courseRepository, userRepository);
+
         // Setup teacher (course owner)
         teacher = new User();
         teacher.setId(1L);
