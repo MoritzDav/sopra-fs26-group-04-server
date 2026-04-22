@@ -1,5 +1,6 @@
 package ch.uzh.ifi.hase.soprafs26.service;
  
+import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
@@ -12,9 +13,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
- 
+
 import java.util.Optional;
- 
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -41,10 +42,12 @@ public class CourseServiceTest {
         teacher = new User();
         teacher.setId(1L);
         teacher.setToken("valid-token");
- 
+        teacher.setRole(UserRole.TEACHER);
+
         otherUser = new User();
         otherUser.setId(2L);
         otherUser.setToken("other-token");
+        otherUser.setRole(UserRole.STUDENT);
  
         course = new Course();
         course.setId(10L);
@@ -53,6 +56,129 @@ public class CourseServiceTest {
         course.setPictureURL("http://original.com/pic.jpg");
         course.setTeacher(teacher);
         course.setCourseCode("ABC123");
+    }
+
+
+    /**
+     * getCourseById
+     */
+
+    @Test
+    public void getCourseById_validId_success() {
+        // given
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+
+        // when
+        Course result = courseService.getCourseById(10L);
+
+        // then
+        assertNotNull(result);
+        assertEquals(10L, result.getId());
+        assertEquals("Original Title", result.getTitle());
+    }
+
+    @Test
+    public void getCourseById_invalidId_throwsNotFound() {
+        // given
+        when(courseRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // when / then
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                courseService.getCourseById(99L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+
+    /**
+     * getCourseByCourseCode
+     */
+
+    @Test
+    public void getCourseByCourseCode_validCode_success() {
+        // given
+        when(courseRepository.findByCourseCode("ABC123")).thenReturn(course);
+
+        // when
+        Course result = courseService.getCourseByCourseCode("ABC123");
+
+        // then
+        assertNotNull(result);
+        assertEquals("ABC123", result.getCourseCode());
+    }
+
+    @Test
+    public void getCourseByCourseCode_invalidCode_throwsNotFound() {
+        // given
+        when(courseRepository.findByCourseCode("BADCODE")).thenReturn(null);
+
+        // when / then
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                courseService.getCourseByCourseCode("BADCODE"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+
+    /**
+     * newCourse
+     */
+
+    @Test
+    public void newCourse_validTeacher_courseCreated() {
+        // given
+        Course input = new Course();
+        input.setTitle("Test Course");
+        input.setDescription("A description");
+
+        Course saved = new Course();
+        saved.setId(10L);
+        saved.setTitle("Test Course");
+        saved.setDescription("A description");
+        saved.setTeacher(teacher);
+        saved.setCourseCode("ABC123");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
+        when(courseRepository.findByCourseCode(any())).thenReturn(null);
+        when(courseRepository.save(any())).thenReturn(saved);
+
+        // when
+        Course result = courseService.newCourse(input, 1L);
+
+        // then
+        assertNotNull(result);
+        assertEquals("Test Course", result.getTitle());
+        assertEquals(teacher, result.getTeacher());
+        assertNotNull(result.getCourseCode());
+        verify(courseRepository).save(any());
+    }
+
+    @Test
+    public void newCourse_teacherNotFound_throwsNotFound() {
+        // given
+        Course input = new Course();
+        input.setTitle("Test Course");
+
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // when / then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.newCourse(input, 99L));
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    public void newCourse_userIsStudent_throwsForbidden() {
+        // given
+        Course input = new Course();
+        input.setTitle("Test Course");
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+
+        // when / then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.newCourse(input, 2L));
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        verify(courseRepository, never()).save(any());
     }
 
 
