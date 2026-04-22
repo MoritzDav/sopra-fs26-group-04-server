@@ -1,7 +1,9 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
+import ch.uzh.ifi.hase.soprafs26.repository.CourseEnrollmentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -10,9 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
-import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
-import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.*;
 import ch.uzh.ifi.hase.soprafs26.constant.SessionMode;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.*;
@@ -27,15 +27,18 @@ public class SessionService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final ChatMessageService chatMessageService;
+    private final CourseEnrollmentRepository courseEnrollmentRepository;
 
     public SessionService(@Qualifier("sessionRepository") SessionRepository sessionRepository,
                           @Qualifier("courseRepository") CourseRepository courseRepository,
                           @Qualifier("userRepository") UserRepository userRepository,
-                          @Qualifier("chatMessageService") ChatMessageService chatMessageService) {
+                          @Qualifier("chatMessageService") ChatMessageService chatMessageService,
+                          @Qualifier("courseEnrollmentRepository")CourseEnrollmentRepository courseEnrollmentRepository) {
         this.sessionRepository = sessionRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.chatMessageService = chatMessageService;
+        this.courseEnrollmentRepository = courseEnrollmentRepository;
     }
 
 
@@ -125,5 +128,29 @@ public class SessionService {
         sessionRepository.save(session);
         sessionRepository.flush();
         log.debug("Ended session {}", sessionId);
+    }
+
+    //Display sessions in a course dashboard
+    public List<Session> getSessionsByCourse(Long courseId, String token){
+
+        //Validate token of user and fetch the user, that creates the session
+        User user = userRepository.findByToken(token)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        //Fetch course
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        //Check if user is teacher or student enrolled in course
+        boolean isTeacher = course.getTeacher().getId().equals(user.getId());
+        boolean isStudent = courseEnrollmentRepository.findByStudentIdAndCourseId(user.getId(), course.getId()).isPresent();
+
+        if (!isTeacher && !isStudent) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not part of this course");
+        }
+
+        //return Sessions
+        return sessionRepository.findByCourseId(courseId);
+
     }
 }
