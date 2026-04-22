@@ -21,12 +21,10 @@ public class CourseController {
     
     private final CourseService courseService;
     private final CourseEnrollmentService courseEnrollmentService;
-    private final OutlookService outlookService;
 
 	CourseController(CourseService courseService, CourseEnrollmentService courseEnrollmentService, OutlookService outlookService) {
 		this.courseService = courseService;
 		this.courseEnrollmentService = courseEnrollmentService;
-		this.outlookService = outlookService;
 	}
 
 
@@ -82,9 +80,10 @@ public class CourseController {
     @GetMapping("/courses/{courseId}/email")
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
-    public String generateCourseEmail(@PathVariable Long courseId) {
+    public String generateCourseEmail(@PathVariable Long courseId,
+                                      @RequestHeader ("Authorization") String token) {
         Course course = courseService.getCourseById(courseId);
-        return outlookService.generateCourseEmailPreview(course);
+        return courseService.generateCourseEmailPreview(course, token);
     }
 
     // Enrolls a student in a course using course code.

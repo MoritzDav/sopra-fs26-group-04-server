@@ -33,6 +33,7 @@ public class CourseService {
 
 	private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final OutlookService outlookService;
     
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int CODE_LENGTH = 6;
@@ -40,9 +41,12 @@ public class CourseService {
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
 
-	public CourseService(@Qualifier("courseRepository") CourseRepository courseRepository, @Qualifier("userRepository") UserRepository userRepository) {
+	public CourseService(@Qualifier("courseRepository") CourseRepository courseRepository,
+                         @Qualifier("userRepository") UserRepository userRepository,
+                         OutlookService outlookService) {
 		this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.outlookService = outlookService;
 	}
 
     public Course newCourse(Course newCourse, Long teacherId, String token) {
@@ -178,6 +182,19 @@ public class CourseService {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate QR code: " + e.getMessage());
         }
+    }
+
+    //Generates an email preview
+
+    public String generateCourseEmailPreview(Course course, String token) {
+
+        //Quick teacher validation
+        User user = getUserByToken(token);
+        validateTeacher(user);
+        validateCourseOwner(course, user);
+
+        //Return the call from outlookService
+        return outlookService.generateCourseEmailPreview(course);
     }
 
 

@@ -4,7 +4,6 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import ch.uzh.ifi.hase.soprafs26.service.CourseEnrollmentService;
@@ -27,8 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -317,6 +315,130 @@ public class CourseControllerTest {
         mockMvc.perform(request)
                 .andExpect(status().isNotFound());
     }
+
+    /**
+     * GET /courses/{courseId}/qr
+     */
+
+    //Valid request
+    @Test
+    void getQRCode_validRequest_returns200() throws Exception {
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        byte[] qrCode = new byte[]{1, 2, 3};
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateQRCode(any(Course.class), eq("teacher-token"))).willReturn(qrCode);
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/qr")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isOk());
+    }
+
+    //Test endpoint for invalid token
+    @Test
+    void getQRCode_invalidToken_returns401() throws Exception {
+
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateQRCode(any(Course.class), eq("invalid-token")))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/qr")
+                .header("Authorization", "invalid-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
+    //Test endpoint for invalid course ID
+    @Test
+    void getQRCode_courseNotFound_returns404() throws Exception {
+        // given
+        given(courseService.getCourseById(99L))
+                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/99/qr")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isNotFound());
+    }
+
+
+    /**
+     * GET /courses/{courseId}/email
+     */
+
+    //Valid Request
+    @Test
+    void generateCourseEmail_validRequest_returns200() throws Exception {
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateCourseEmailPreview(any(Course.class), eq("teacher-token")))
+                .willReturn("<html>Email</html>");
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/email")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isOk());
+    }
+
+    //Test endpoint for invalid token
+    @Test
+    void generateCourseEmail_invalidToken_returns401() throws Exception {
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateCourseEmailPreview(any(Course.class), eq("invalid-token")))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/email")
+                .header("Authorization", "invalid-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
+    //Test endpoint for invalid course ID
+    @Test
+    void generateCourseEmail_courseNotFound_returns404() throws Exception {
+        // given
+        given(courseService.getCourseById(99L))
+                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/99/email")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isNotFound());
+    }
+
 
     /**
      * GET /courses/{courseId}
