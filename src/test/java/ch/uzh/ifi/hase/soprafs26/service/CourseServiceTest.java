@@ -256,7 +256,7 @@ public class CourseServiceTest {
 
     //Check whether updating with an invalid token throws not found
     @Test
-    public void updateCourse_invalidToken_unauthorized(){
+    public void updateCourse_invalidToken_notFound(){
 
         //given
         CoursePutDTO dto = new CoursePutDTO();
@@ -267,7 +267,7 @@ public class CourseServiceTest {
                 courseService.updateCourse(10L, "invalid-token", dto));
         
         //then
-        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
     }
 
     //Check whether updating with an invalid courseId throws not found

@@ -79,7 +79,7 @@ public class CourseService {
     public void updateCourse(Long courseId, String token, CoursePutDTO coursePutDTO){
     
         //Fetch the requesting user from the DB via token and validate
-        User user = getUserByToken(token);
+        User user = getUserByTokenForUpdate(token);
 
         //Fetch the respective Course from the DB
         Course course = getCourseById(courseId);
@@ -97,6 +97,12 @@ public class CourseService {
         courseRepository.flush();
 
         log.debug("Updated course informations for Course: {}", course);    
+    }
+
+    //Fetch user via token for update route (returns NOT_FOUND for null/invalid token)
+    private User getUserByTokenForUpdate(String token) {
+        return userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
     }
 
     //Delete a course as the corresponding teacher
