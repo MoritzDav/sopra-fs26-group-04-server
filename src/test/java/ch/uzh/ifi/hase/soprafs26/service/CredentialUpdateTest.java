@@ -41,6 +41,9 @@ public class CredentialUpdateTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private OutlookService outlookService;
+
     private CourseService courseService;
 
     private User teacher;
@@ -49,8 +52,8 @@ public class CredentialUpdateTest {
 
     @BeforeEach
     public void setup() {
-        // Manually instantiate CourseService with mocked repositories
-        courseService = new CourseService(courseRepository, userRepository);
+        // Manually instantiate CourseService with mocked repositories and services
+        courseService = new CourseService(courseRepository, userRepository, outlookService);
 
         // Setup teacher (course owner)
         teacher = new User();
