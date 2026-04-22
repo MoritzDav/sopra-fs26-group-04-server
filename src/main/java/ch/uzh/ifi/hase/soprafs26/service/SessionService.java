@@ -26,13 +26,16 @@ public class SessionService {
     private final SessionRepository sessionRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final ChatMessageService chatMessageService;
 
     public SessionService(@Qualifier("sessionRepository") SessionRepository sessionRepository,
                           @Qualifier("courseRepository") CourseRepository courseRepository,
-                          @Qualifier("userRepository") UserRepository userRepository) {
+                          @Qualifier("userRepository") UserRepository userRepository,
+                          @Qualifier("chatMessageService") ChatMessageService chatMessageService) {
         this.sessionRepository = sessionRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.chatMessageService = chatMessageService;
     }
 
 
@@ -115,6 +118,9 @@ public class SessionService {
         }
 
         session.setActive(false);
+
+        // Delete all chat messages associated with this session
+        chatMessageService.deleteSessionMessages(sessionId);
 
         sessionRepository.save(session);
         sessionRepository.flush();

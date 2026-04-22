@@ -8,6 +8,7 @@ import org.springframework.web.server.ResponseStatusException;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.entity.Session;
+import ch.uzh.ifi.hase.soprafs26.entity.ChatMessage;
 import ch.uzh.ifi.hase.soprafs26.constant.*;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserAuthDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPostDTO;
@@ -15,6 +16,8 @@ import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionGetDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.ChatMessageGetDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.ChatMessagePostDTO;
 
 /**
  * DTOMapper
@@ -98,4 +101,15 @@ public interface DTOMapper {
 	@Mapping(source = "selectedWhiteboard.whiteboardId", target = "selectedWhiteboardId")
 	SessionGetDTO convertSessionEntityToSessionGetDTO(Session session);
 	
+	//ChatMessage mappings
+
+	@Mapping(source = "messageId", target = "messageId")
+	@Mapping(source = "session.sessionId", target = "sessionId")
+	@Mapping(source = "user.id", target = "userId")
+	@Mapping(source = "user.username", target = "username")
+	@Mapping(source = "content", target = "content")
+	@Mapping(source = "timestamp", target = "timestamp")
+	ChatMessageGetDTO convertChatMessageEntityToGetDTO(ChatMessage chatMessage);
+	
 }
+
