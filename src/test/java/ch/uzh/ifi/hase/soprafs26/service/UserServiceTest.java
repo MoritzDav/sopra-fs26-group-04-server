@@ -15,6 +15,7 @@ import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,6 +35,7 @@ public class UserServiceTest {
 	private UserService userService;
 
 	private User testUser;
+	private User offlineUser;
 
 	@BeforeEach
 	public void setup() {
@@ -49,6 +51,17 @@ public class UserServiceTest {
 		testUser.setRole(UserRole.STUDENT);
 		testUser.setStatus(UserStatus.ONLINE);
 		testUser.setToken("test-token-uuid");
+
+		//Create an offline user
+		offlineUser = new User();
+		offlineUser.setId(1L);
+		offlineUser.setFirstName("Test");
+		offlineUser.setLastName("User");
+		offlineUser.setUsername("testuser");
+		offlineUser.setPassword("password123");
+		offlineUser.setRole(UserRole.STUDENT);
+		offlineUser.setStatus(UserStatus.OFFLINE);
+		offlineUser.setToken("test-token-uuid");
 	}
 
 	// ============ Create User Tests ============
@@ -223,19 +236,12 @@ public class UserServiceTest {
 	public void logoutUser_validIdAndRequestingUser_success() {
 		// given
 		testUser.setStatus(UserStatus.ONLINE);
-		User offlineUser = new User();
-		offlineUser.setId(1L);
-		offlineUser.setFirstName("Test");
-		offlineUser.setLastName("User");
-		offlineUser.setUsername("testuser");
-		offlineUser.setStatus(UserStatus.OFFLINE);
-		offlineUser.setToken("test-token-uuid");
 
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when
-		User loggedOutUser = userService.logoutUser(1L, 1L);
+		User loggedOutUser = userService.logoutUser("test-token-uuid");
 
 		// then
 		Mockito.verify(userRepository, Mockito.times(1)).save(Mockito.any());
@@ -246,36 +252,22 @@ public class UserServiceTest {
 	}
 
 	@Test
-	public void logoutUser_ownershipCheckFails_throwsException() {
+	public void logoutUser_invalidToken_throwsException() {
+		
 		// given
-		Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
 
-		// when & then - User 1 trying to logout User 2
+		// when & then
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> userService.logoutUser(2L, 1L));
+				() -> userService.logoutUser("invalid-token"));
 
-		assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
-		assertTrue(exception.getReason().contains("only logout your own account"));
-
-		// Verify save was never called
+		assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+		assertTrue(exception.getReason().contains("Invalid token"));
 		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
 	}
 
 	@Test
-	public void logoutUser_userNotFound_throwsException() {
-		// given
-		Mockito.when(userRepository.findById(999L)).thenReturn(Optional.empty());
-
-		// when & then
-		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> userService.logoutUser(999L, 999L));
-
-		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-		assertTrue(exception.getReason().contains("User not found"));
-	}
-
-	@Test
-	public void logoutUser_correctOwnership_success() {
+	public void logoutUser_validToken_differentUser_success() {
 		// given - User 5 logging out themselves
 		User user5 = new User();
 		user5.setId(5L);
@@ -293,11 +285,11 @@ public class UserServiceTest {
 		offlineUser5.setStatus(UserStatus.OFFLINE);
 		offlineUser5.setToken("alice-token");
 
-		Mockito.when(userRepository.findById(5L)).thenReturn(Optional.of(user5));
+		Mockito.when(userRepository.findByToken("alice-token")).thenReturn(Optional.of(user5));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser5);
 
 		// when
-		User loggedOut = userService.logoutUser(5L, 5L);
+		User loggedOut = userService.logoutUser("alice-token");
 
 		// then
 		assertEquals(UserStatus.OFFLINE, loggedOut.getStatus());
@@ -318,6 +310,7 @@ public class UserServiceTest {
 		onlineUser.setRole(UserRole.STUDENT);
 		onlineUser.setStatus(UserStatus.ONLINE);
 		onlineUser.setToken("test-token");
+		onlineUser.setToken(UUID.randomUUID().toString());
 		
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(onlineUser);
 
@@ -327,6 +320,7 @@ public class UserServiceTest {
 		// then
 		assertEquals(UserStatus.ONLINE, loggedInUser.getStatus());
 		assertEquals("testuser", loggedInUser.getUsername());
+		assertNotNull(loggedInUser.getToken());
 		Mockito.verify(userRepository).findByUsername("testuser");
 		Mockito.verify(userRepository).save(Mockito.any());
 	}
@@ -418,17 +412,11 @@ public class UserServiceTest {
 		testUser.setStatus(UserStatus.ONLINE);
 		String originalToken = testUser.getToken();
 
-		User offlineUser = new User();
-		offlineUser.setId(1L);
-		offlineUser.setUsername("testuser");
-		offlineUser.setStatus(UserStatus.OFFLINE);
-		offlineUser.setToken(originalToken); // Token should persist
-
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken(originalToken)).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when
-		User loggedOutUser = userService.logoutUser(1L, 1L);
+		User loggedOutUser = userService.logoutUser(originalToken);
 
 		// then
 		assertEquals(originalToken, loggedOutUser.getToken());
@@ -512,17 +500,11 @@ public class UserServiceTest {
 		// given
 		testUser.setStatus(UserStatus.ONLINE);
 
-		User offlineUser = new User();
-		offlineUser.setId(1L);
-		offlineUser.setUsername("testuser");
-		offlineUser.setStatus(UserStatus.OFFLINE);
-		offlineUser.setToken(testUser.getToken());
-
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when
-		User loggedOutUser = userService.logoutUser(1L, 1L);
+		User loggedOutUser = userService.logoutUser("test-token-uuid");
 
 		// then
 		assertEquals(UserStatus.OFFLINE, loggedOutUser.getStatus());
@@ -534,30 +516,17 @@ public class UserServiceTest {
 	public void logoutUser_preservesOtherFields() {
 		// given
 		testUser.setStatus(UserStatus.ONLINE);
-		testUser.setFirstName("John");
-		testUser.setLastName("Doe");
-		testUser.setUsername("johndoe");
-		testUser.setRole(UserRole.STUDENT);
 
-		User offlineUser = new User();
-		offlineUser.setId(1L);
-		offlineUser.setFirstName("John");
-		offlineUser.setLastName("Doe");
-		offlineUser.setUsername("johndoe");
-		offlineUser.setRole(UserRole.STUDENT);
-		offlineUser.setStatus(UserStatus.OFFLINE);
-		offlineUser.setToken(testUser.getToken());
-
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when
-		User loggedOutUser = userService.logoutUser(1L, 1L);
+		User loggedOutUser = userService.logoutUser("test-token-uuid");
 
 		// then - Verify all fields except status remain unchanged
-		assertEquals("John", loggedOutUser.getFirstName());
-		assertEquals("Doe", loggedOutUser.getLastName());
-		assertEquals("johndoe", loggedOutUser.getUsername());
+		assertEquals("Test", loggedOutUser.getFirstName());
+		assertEquals("User", loggedOutUser.getLastName());
+		assertEquals("testuser", loggedOutUser.getUsername());
 		assertEquals(UserRole.STUDENT, loggedOutUser.getRole());
 		assertEquals(testUser.getToken(), loggedOutUser.getToken());
 		assertEquals(UserStatus.OFFLINE, loggedOutUser.getStatus());
@@ -568,17 +537,11 @@ public class UserServiceTest {
 		// given - User is already offline
 		testUser.setStatus(UserStatus.OFFLINE);
 
-		User offlineUser = new User();
-		offlineUser.setId(1L);
-		offlineUser.setUsername("testuser");
-		offlineUser.setStatus(UserStatus.OFFLINE);
-		offlineUser.setToken(testUser.getToken());
-
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when
-		User loggedOutUser = userService.logoutUser(1L, 1L);
+		User loggedOutUser = userService.logoutUser("test-token-uuid");
 
 		// then - Even if already offline, logout still works
 		assertEquals(UserStatus.OFFLINE, loggedOutUser.getStatus());
@@ -590,16 +553,11 @@ public class UserServiceTest {
 		// given
 		testUser.setStatus(UserStatus.ONLINE);
 
-		User offlineUser = new User();
-		offlineUser.setId(1L);
-		offlineUser.setStatus(UserStatus.OFFLINE);
-		offlineUser.setToken(testUser.getToken());
-
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when
-		userService.logoutUser(1L, 1L);
+		userService.logoutUser("test-token-uuid");
 
 		// then - Verify save and flush were called
 		Mockito.verify(userRepository, Mockito.times(1)).save(Mockito.any());
@@ -611,26 +569,20 @@ public class UserServiceTest {
 		// given - First logout
 		testUser.setStatus(UserStatus.ONLINE);
 
-		User offlineUser = new User();
-		offlineUser.setId(1L);
-		offlineUser.setUsername("testuser");
-		offlineUser.setStatus(UserStatus.OFFLINE);
-		offlineUser.setToken(testUser.getToken());
-
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when - First logout
-		User firstLogout = userService.logoutUser(1L, 1L);
+		User firstLogout = userService.logoutUser("test-token-uuid");
 		assertEquals(UserStatus.OFFLINE, firstLogout.getStatus());
 
 		// Prepare for second logout attempt
 		Mockito.reset(userRepository);
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(offlineUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(offlineUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(offlineUser);
 
 		// when - Second logout should succeed
-		User secondLogout = userService.logoutUser(1L, 1L);
+		User secondLogout = userService.logoutUser("test-token-uuid");
 
 		// then - Status remains offline
 		assertEquals(UserStatus.OFFLINE, secondLogout.getStatus());
@@ -645,6 +597,7 @@ public class UserServiceTest {
 		testUser.setLastName("Smith");
 		testUser.setUsername("alice");
 		testUser.setRole(UserRole.TEACHER);
+		testUser.setToken("test-token-uuid");
 
 		User loggedOutUser = new User();
 		loggedOutUser.setId(1L);
@@ -653,13 +606,13 @@ public class UserServiceTest {
 		loggedOutUser.setUsername("alice");
 		loggedOutUser.setRole(UserRole.TEACHER);
 		loggedOutUser.setStatus(UserStatus.OFFLINE);
-		loggedOutUser.setToken(testUser.getToken());
+		loggedOutUser.setToken("test-token-uuid");
 
-		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByToken("test-token-uuid")).thenReturn(Optional.of(testUser));
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(loggedOutUser);
 
 		// when
-		User result = userService.logoutUser(1L, 1L);
+		User result = userService.logoutUser("test-token-uuid");
 
 		// then - Verify complete user object is returned
 		assertNotNull(result);
@@ -670,39 +623,6 @@ public class UserServiceTest {
 		assertEquals(UserRole.TEACHER, result.getRole());
 		assertNotNull(result.getToken());
 		assertEquals(UserStatus.OFFLINE, result.getStatus());
-	}
-
-	@Test
-	public void logoutUser_wrongOwner_doesNotLogout() {
-		// given - User A tries to logout User B
-		User userB = new User();
-		userB.setId(2L);
-		userB.setUsername("userb");
-		userB.setStatus(UserStatus.ONLINE);
-
-		Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(userB));
-
-		// when & then
-		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> userService.logoutUser(2L, 1L)); // User 1 trying to logout User 2
-
-		assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
-		// Verify no save operation occurred
-		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
-	}
-
-	@Test
-	public void logoutUser_nonExistentUser_throwsNotFound() {
-		// given
-		Mockito.when(userRepository.findById(999L)).thenReturn(Optional.empty());
-
-		// when & then
-		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-				() -> userService.logoutUser(999L, 999L));
-
-		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-		// Verify no save operation occurred
-		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
 	}
 
 }
