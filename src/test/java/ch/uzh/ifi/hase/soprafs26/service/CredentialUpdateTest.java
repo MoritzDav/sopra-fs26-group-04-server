@@ -63,7 +63,11 @@ public class CredentialUpdateTest {
         unauthorizedUser.setUsername("student_alice");
         unauthorizedUser.setToken("student-token-invalid");
 
-        // Setup course
+        // Setup course - fresh instance for each test
+        resetCourse();
+    }
+
+    private void resetCourse() {
         course = new Course();
         course.setId(100L);
         course.setTitle("Original Web Development");
@@ -78,6 +82,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_allFieldsUpdated_success() {
         // given - Update all credential fields
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         dto.setTitle("Advanced Web Development");
         dto.setDescription("Learn advanced web dev concepts");
@@ -100,6 +105,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_titleOnly_success() {
         // given - Update only title
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         dto.setTitle("New Title Only");
 
@@ -120,6 +126,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_descriptionOnly_success() {
         // given - Update only description
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         dto.setDescription("Brand new description");
 
@@ -140,6 +147,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_pictureURLOnly_success() {
         // given - Update only picture URL
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         dto.setPictureURL("https://example.com/updated-pic.jpg");
 
@@ -160,6 +168,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_titleAndDescription_success() {
         // given - Update title and description
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         dto.setTitle("New Title");
         dto.setDescription("New Description");
@@ -181,6 +190,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_emptyDTO_nothingChanges() {
         // given - Empty DTO (no fields updated)
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
 
         when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
@@ -270,6 +280,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_longTitle_success() {
         // given - Very long title
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         String longTitle = "A".repeat(200);
         dto.setTitle(longTitle);
@@ -289,6 +300,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_longDescription_success() {
         // given - Very long description
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         String longDescription = "Description with lots of content. ".repeat(50);
         dto.setDescription(longDescription);
@@ -308,6 +320,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_emptyTitleString_success() {
         // given - Empty string for title
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         dto.setTitle("");
 
@@ -326,6 +339,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_specialCharactersInTitle_success() {
         // given - Title with special characters
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         String titleWithSpecialChars = "Web Dev 2.0: $100 Course @Home!";
         dto.setTitle(titleWithSpecialChars);
@@ -345,6 +359,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_unicodeCharacters_success() {
         // given - Title with unicode characters
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         String titleWithUnicode = "Web Development 网络开发 🌐";
         dto.setTitle(titleWithUnicode);
@@ -366,6 +381,7 @@ public class CredentialUpdateTest {
     @Test
     public void updateCourse_verifyRepositoryCalledOnce() {
         // given
+        resetCourse();
         CoursePutDTO dto = new CoursePutDTO();
         dto.setTitle("New Title");
 
