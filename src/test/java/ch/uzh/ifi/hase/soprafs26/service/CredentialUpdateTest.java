@@ -8,9 +8,10 @@ import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.*;
  * - Authorization checks
  * - Validation of inputs
  */
+@ExtendWith(MockitoExtension.class)
 @Timeout(10) // 10 second timeout for unit tests
 public class CredentialUpdateTest {
 
@@ -49,8 +51,6 @@ public class CredentialUpdateTest {
 
     @BeforeEach
     public void setup() {
-        MockitoAnnotations.openMocks(this);
-
         // Setup teacher (course owner)
         teacher = new User();
         teacher.setId(1L);
