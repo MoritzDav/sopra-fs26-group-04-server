@@ -17,7 +17,6 @@ import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 
 import java.util.Random;
-import java.util.Optional;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
@@ -42,26 +41,33 @@ public class CourseService {
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
 
-	public CourseService(@Qualifier("courseRepository") CourseRepository courseRepository, @Qualifier("userRepository") UserRepository userRepository, OutlookService outlookService) {
+	public CourseService(@Qualifier("courseRepository") CourseRepository courseRepository,
+                         @Qualifier("userRepository") UserRepository userRepository,
+                         OutlookService outlookService) {
 		this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.outlookService = outlookService;
 	}
 
-    public Course newCourse(Course newCourse, Long teacherId) {
+    public Course newCourse(Course newCourse, Long teacherId, String token) {
         
-        //Fetch full user from database
-        User teacher = userRepository.findById(teacherId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
+        //Fetch the requesting user from the DB via token
+        User user = getUserByToken(token);
 
-        //Check whether user is a teacher
-        if (teacher.getRole() != UserRole.TEACHER) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only teachers are allowed to create a new course");
+        //Fetch user via id
+        User teacher = userRepository.findById(teacherId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        //Check whether token-user matches Id-User
+        if (!user.getId().equals(teacher.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You're not allowed to create courses for other users");
         }
-        
+
+        //Validation
+        validateTeacher(user);
+
+        //Build Course
         newCourse.setTeacher(teacher);
-
         newCourse.setCourseCode(generateUniqueCourseCode());
-
         newCourse = courseRepository.save(newCourse);
         courseRepository.flush();
 
@@ -72,17 +78,15 @@ public class CourseService {
     //Update course credentials i.e. title, description, picture
     public void updateCourse(Long courseId, String token, CoursePutDTO coursePutDTO){
     
-        //Fetch the requesting user from the DB
-        User requestingUser = userRepository.findByToken(token)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
-    
-        //Fetch the respective Course from the DB
-        Course course = courseRepository.findById(courseId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+        //Fetch the requesting user from the DB via token and validate
+        User user = getUserByToken(token);
 
-        //See if requesting user matches course teacher
-        if (!course.getTeacher().getId().equals(requestingUser.getId())){
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of the course");
-        }
+        //Fetch the respective Course from the DB
+        Course course = getCourseById(courseId);
+
+        //Validation process
+        validateTeacher(user);
+        validateCourseOwner(course, user);
 
         //Change the respecting fields if they exist in the DTO
         if (coursePutDTO.getTitle() != null) course.setTitle(coursePutDTO.getTitle());
@@ -98,16 +102,15 @@ public class CourseService {
     //Delete a course as the corresponding teacher
     public void deleteCourse(Long courseId, String token){
         
-        //Fetch the requesting user from the DB
-        User requestingUser = userRepository.findByToken(token).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
+        //Fetch the requesting user from the DB via token and validation
+        User user = getUserByToken(token);
 
         //Fetch the respective Course from the DB
-        Course course = courseRepository.findById(courseId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+        Course course = getCourseById(courseId);
 
-        //See if requesting user matches course teacher
-        if (!course.getTeacher().getId().equals(requestingUser.getId())){
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of the course");
-        }
+        //Validation process
+        validateTeacher(user);
+        validateCourseOwner(course, user);
 
         courseRepository.delete(course);
 
@@ -127,7 +130,6 @@ public class CourseService {
         return courseCode;
     }
 
-   
     private String generateRandomCode() {
         Random random = new Random();
         StringBuilder code = new StringBuilder();
@@ -138,7 +140,6 @@ public class CourseService {
 
         return code.toString();
     }
-
 
     // Retrieves a course by its ID from the database.
     public Course getCourseById(Long courseId) {
@@ -156,7 +157,13 @@ public class CourseService {
     }
 
     // Generates a QR code for the given course that redirects to the course page.
-    public byte[] generateQRCode(Course course) {
+    public byte[] generateQRCode(Course course, String token) {
+        
+        //Quick teacher validation
+        User user = getUserByToken(token);
+        validateTeacher(user);
+        validateCourseOwner(course, user);
+
         try {
             // Create a URL that points to the course page
             String courseUrl = String.format(
@@ -176,4 +183,45 @@ public class CourseService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate QR code: " + e.getMessage());
         }
     }
+
+    //Generates an email preview
+
+    public String generateCourseEmailPreview(Course course, String token) {
+
+        //Quick teacher validation
+        User user = getUserByToken(token);
+        validateTeacher(user);
+        validateCourseOwner(course, user);
+
+        //Return the call from outlookService
+        return outlookService.generateCourseEmailPreview(course);
+    }
+
+
+    //Helper functions for the checks
+
+    //Fetch user via token including validation
+    private User getUserByToken(String token){
+        return userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+    }
+
+    //Check if user is a teacher
+    private void validateTeacher(User user){
+        if (user.getRole() != UserRole.TEACHER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only teachers can do this");
+        }
+    }
+
+    //Check if user is owner of course
+    private void validateCourseOwner(Course course, User user){
+
+        if (!course.getTeacher().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of this course");
+        }
+    }
 }
+
+
+
+

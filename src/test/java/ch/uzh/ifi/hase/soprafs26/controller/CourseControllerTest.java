@@ -4,7 +4,6 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import ch.uzh.ifi.hase.soprafs26.service.CourseEnrollmentService;
@@ -27,8 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -73,11 +71,12 @@ public class CourseControllerTest {
         created.setCourseCode("XYZ999");
         created.setTeacher(teacher);
 
-        given(courseService.newCourse(any(Course.class), eq(1L))).willReturn(created);
+        given(courseService.newCourse(any(Course.class), eq(1L), any(String.class))).willReturn(created);
 
         // when
         MockHttpServletRequestBuilder request = post("/courses")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "test-token")
                 .content(asJsonString(dto));
 
         // then
@@ -95,12 +94,13 @@ public class CourseControllerTest {
         dto.setTitle("Math 101");
         dto.setTeacherId(99L);
 
-        given(courseService.newCourse(any(Course.class), eq(99L)))
+        given(courseService.newCourse(any(Course.class), eq(99L), any(String.class)))
                 .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User/teacher not found"));
 
         // when
         MockHttpServletRequestBuilder request = post("/courses")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "test-token")
                 .content(asJsonString(dto));
 
         // then
@@ -115,12 +115,13 @@ public class CourseControllerTest {
         dto.setTitle("Math 101");
         dto.setTeacherId(2L);
 
-        given(courseService.newCourse(any(Course.class), eq(2L)))
+        given(courseService.newCourse(any(Course.class), eq(2L), any(String.class)))
                 .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Only teachers are allowed to create a new course"));
 
         // when
         MockHttpServletRequestBuilder request = post("/courses")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "test-token")
                 .content(asJsonString(dto));
 
         // then
@@ -316,6 +317,130 @@ public class CourseControllerTest {
     }
 
     /**
+     * GET /courses/{courseId}/qr
+     */
+
+    //Valid request
+    @Test
+    void getQRCode_validRequest_returns200() throws Exception {
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        byte[] qrCode = new byte[]{1, 2, 3};
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateQRCode(any(Course.class), eq("teacher-token"))).willReturn(qrCode);
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/qr")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isOk());
+    }
+
+    //Test endpoint for invalid token
+    @Test
+    void getQRCode_invalidToken_returns401() throws Exception {
+
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateQRCode(any(Course.class), eq("invalid-token")))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/qr")
+                .header("Authorization", "invalid-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
+    //Test endpoint for invalid course ID
+    @Test
+    void getQRCode_courseNotFound_returns404() throws Exception {
+        // given
+        given(courseService.getCourseById(99L))
+                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/99/qr")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isNotFound());
+    }
+
+
+    /**
+     * GET /courses/{courseId}/email
+     */
+
+    //Valid Request
+    @Test
+    void generateCourseEmail_validRequest_returns200() throws Exception {
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateCourseEmailPreview(any(Course.class), eq("teacher-token")))
+                .willReturn("<html>Email</html>");
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/email")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isOk());
+    }
+
+    //Test endpoint for invalid token
+    @Test
+    void generateCourseEmail_invalidToken_returns401() throws Exception {
+        // given
+        Course course = new Course();
+        course.setId(1L);
+
+        given(courseService.getCourseById(1L)).willReturn(course);
+        given(courseService.generateCourseEmailPreview(any(Course.class), eq("invalid-token")))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/1/email")
+                .header("Authorization", "invalid-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
+    //Test endpoint for invalid course ID
+    @Test
+    void generateCourseEmail_courseNotFound_returns404() throws Exception {
+        // given
+        given(courseService.getCourseById(99L))
+                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/courses/99/email")
+                .header("Authorization", "teacher-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isNotFound());
+    }
+
+
+    /**
      * GET /courses/{courseId}
      */
 
@@ -374,11 +499,11 @@ public class CourseControllerTest {
         enrollment.setCourseId(10L);
         enrollment.setJoinedDate(java.time.LocalDateTime.now());
 
-        given(courseEnrollmentService.enrollStudentByCourseCode(1L, "ABC123")).willReturn(enrollment);
+        given(courseEnrollmentService.enrollStudentByCourseCode("student-token", "ABC123")).willReturn(enrollment);
 
         // when
         MockHttpServletRequestBuilder request = post("/courses/ABC123/enroll")
-                .param("studentId", "1");
+                .header("Authorization", "student-token");
 
         // then
         mockMvc.perform(request)
@@ -390,12 +515,12 @@ public class CourseControllerTest {
     @Test
     public void enrollStudent_studentNotFound_returns404() throws Exception {
         // given
-        given(courseEnrollmentService.enrollStudentByCourseCode(99L, "ABC123"))
+        given(courseEnrollmentService.enrollStudentByCourseCode("student-token", "ABC123"))
                 .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
 
         // when
         MockHttpServletRequestBuilder request = post("/courses/ABC123/enroll")
-                .param("studentId", "99");
+                .header("Authorization", "student-token");
 
         // then
         mockMvc.perform(request)
@@ -405,12 +530,12 @@ public class CourseControllerTest {
     @Test
     public void enrollStudent_courseNotFound_returns404() throws Exception {
         // given
-        given(courseEnrollmentService.enrollStudentByCourseCode(1L, "BADCODE"))
+        given(courseEnrollmentService.enrollStudentByCourseCode("student-token", "BADCODE"))
                 .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course code not found"));
 
         // when
         MockHttpServletRequestBuilder request = post("/courses/BADCODE/enroll")
-                .param("studentId", "1");
+                .header("Authorization", "student-token");
 
         // then
         mockMvc.perform(request)
@@ -420,12 +545,12 @@ public class CourseControllerTest {
     @Test
     public void enrollStudent_alreadyEnrolled_returns409() throws Exception {
         // given
-        given(courseEnrollmentService.enrollStudentByCourseCode(1L, "ABC123"))
+        given(courseEnrollmentService.enrollStudentByCourseCode("student-token", "ABC123"))
                 .willThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Student is already enrolled in this course"));
 
         // when
         MockHttpServletRequestBuilder request = post("/courses/ABC123/enroll")
-                .param("studentId", "1");
+                .header("Authorization", "student-token");
 
         // then
         mockMvc.perform(request)
@@ -457,10 +582,11 @@ public class CourseControllerTest {
         enrollment.setJoinedDate(java.time.LocalDateTime.now());
 
         given(courseService.getCourseByCourseCode("ABC123")).willReturn(course);
-        given(courseEnrollmentService.getStudentsInCourse(10L)).willReturn(java.util.List.of(enrollment));
+        given(courseEnrollmentService.getStudentsInCourse(10L, "teacher-token")).willReturn(java.util.List.of(enrollment));
 
         // when
-        MockHttpServletRequestBuilder request = get("/courses/ABC123/students");
+        MockHttpServletRequestBuilder request = get("/courses/ABC123/students")
+                .header("Authorization", "teacher-token");
 
         // then
         mockMvc.perform(request)
@@ -473,10 +599,11 @@ public class CourseControllerTest {
     public void getStudentsInCourse_courseNotFound_returns404() throws Exception {
         // given
         given(courseService.getCourseByCourseCode("BADCODE"))
-                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course code not found"));
+                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
 
         // when
-        MockHttpServletRequestBuilder request = get("/courses/BADCODE/students");
+        MockHttpServletRequestBuilder request = get("/courses/BADCODE/students")
+                .header("Authorization", "teacher-token");
 
         // then
         mockMvc.perform(request)
