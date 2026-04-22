@@ -25,7 +25,7 @@ jobs:
            java-version: '17'
 
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew clean build --no-daemon
 
       - name: Test with Gradle
-        run: ./gradlew test
+        run: ./gradlew test --no-daemon
