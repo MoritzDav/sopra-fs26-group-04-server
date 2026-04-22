@@ -9,8 +9,8 @@ RUN chmod +x ./gradlew
 # Copy build script and source code
 COPY build.gradle settings.gradle /app/
 COPY src /app/src
-# Build the server
-RUN ./gradlew clean build --no-daemon
+# Build the server (skip tests in Docker for faster builds)
+RUN ./gradlew clean build --no-daemon -x test
 
 # make image smaller by using multi stage build
 FROM eclipse-temurin:17-jdk
