@@ -136,12 +136,13 @@ public class CourseServiceTest {
         saved.setTeacher(teacher);
         saved.setCourseCode("ABC123");
 
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
         when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
         when(courseRepository.findByCourseCode(any())).thenReturn(null);
         when(courseRepository.save(any())).thenReturn(saved);
 
         // when
-        Course result = courseService.newCourse(input, 1L);
+        Course result = courseService.newCourse(input, 1L, "teacher-token");
 
         // then
         assertNotNull(result);
@@ -157,11 +158,12 @@ public class CourseServiceTest {
         Course input = new Course();
         input.setTitle("Test Course");
 
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
         // when / then
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
-                courseService.newCourse(input, 99L));
+                courseService.newCourse(input, 99L, "teacher-token"));
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
         verify(courseRepository, never()).save(any());
     }
@@ -172,11 +174,12 @@ public class CourseServiceTest {
         Course input = new Course();
         input.setTitle("Test Course");
 
+        when(userRepository.findByToken("other-token")).thenReturn(Optional.of(otherUser));
         when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
 
         // when / then
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
-                courseService.newCourse(input, 2L));
+                courseService.newCourse(input, 2L, "other-token"));
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
         verify(courseRepository, never()).save(any());
     }
@@ -253,7 +256,7 @@ public class CourseServiceTest {
 
     //Check whether updating with an invalid token throws not found
     @Test
-    public void updateCourse_invalidToken_notFound(){
+    public void updateCourse_invalidToken_unauthorized(){
 
         //given
         CoursePutDTO dto = new CoursePutDTO();
@@ -264,7 +267,7 @@ public class CourseServiceTest {
                 courseService.updateCourse(10L, "invalid-token", dto));
         
         //then
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
     }
 
     //Check whether updating with an invalid courseId throws not found
@@ -322,7 +325,7 @@ public class CourseServiceTest {
     }
     
     @Test
-    public void deleteCourse_invalidToken_notfFound(){
+    public void deleteCourse_invalidToken_unauthorized(){
 
         //given
         when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
@@ -332,7 +335,7 @@ public class CourseServiceTest {
             courseService.deleteCourse(10L, "invalid-token"));
             
         //then
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
     }
 
     @Test

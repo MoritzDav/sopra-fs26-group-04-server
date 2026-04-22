@@ -22,7 +22,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doReturn;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -241,11 +240,11 @@ public class UserControllerTest {
         loggedOut.setStatus(UserStatus.OFFLINE);
         loggedOut.setRole(UserRole.STUDENT);
 
-        given(userService.logoutUser(1L, 1L)).willReturn(loggedOut);
+        given(userService.logoutUser("some-token")).willReturn(loggedOut);
 
         // when
-        MockHttpServletRequestBuilder request = post("/users/1/logout")
-                .param("requestingUserId", "1");
+        MockHttpServletRequestBuilder request = post("/users/logout")
+                .header("Authorization", "some-token");
 
         // then
         mockMvc.perform(request)
@@ -254,33 +253,18 @@ public class UserControllerTest {
     }
 
     @Test
-    public void logoutUser_differentUser_returns403() throws Exception {
+    public void logoutUser_invalidToken_returns404() throws Exception {
         // given
-        given(userService.logoutUser(eq(1L), eq(2L)))
-                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only logout your own account"));
+        given(userService.logoutUser("invalid-token"))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You can only logout your own account"));
 
         // when
-        MockHttpServletRequestBuilder request = post("/users/1/logout")
-                .param("requestingUserId", "2");
+        MockHttpServletRequestBuilder request = post("/users/logout")
+                .header("Authorization", "invalid-token");
 
         // then
         mockMvc.perform(request)
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void logoutUser_userNotFound_returns404() throws Exception {
-        // given
-        given(userService.logoutUser(eq(99L), eq(99L)))
-                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-
-        // when
-        MockHttpServletRequestBuilder request = post("/users/99/logout")
-                .param("requestingUserId", "99");
-
-        // then
-        mockMvc.perform(request)
-                .andExpect(status().isNotFound());
+                .andExpect(status().isUnauthorized());
     }
 
 
