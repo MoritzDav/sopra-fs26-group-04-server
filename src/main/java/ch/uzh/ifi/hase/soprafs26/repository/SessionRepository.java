@@ -11,5 +11,6 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     
     Session findByTitle(String title);
     List<Session> findByCourseId(Long courseId);
+    void deleteByCourseId(Long courseId);
 
 }

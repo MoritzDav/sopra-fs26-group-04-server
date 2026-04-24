@@ -4,6 +4,8 @@ import ch.uzh.ifi.hase.soprafs26.constant.SessionMode;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 
 import jakarta.persistence.*;
@@ -44,6 +46,9 @@ public class Session implements Serializable{
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "teacher_whiteboard_id")
     private TeacherWhiteboard teacherWhiteboard;
+
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ChatMessage> chatMessages = new ArrayList<>();
 
     public Long getSessionId() { 
         return sessionId; 
