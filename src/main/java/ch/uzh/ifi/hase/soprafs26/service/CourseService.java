@@ -1,6 +1,7 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
 
+import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -33,6 +34,7 @@ public class CourseService {
 
 	private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final SessionRepository sessionRepository;
     private final OutlookService outlookService;
     
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -43,9 +45,11 @@ public class CourseService {
 
 	public CourseService(@Qualifier("courseRepository") CourseRepository courseRepository,
                          @Qualifier("userRepository") UserRepository userRepository,
+                         @Qualifier("sessionRepository") SessionRepository sessionRepository,
                          OutlookService outlookService) {
 		this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.sessionRepository = sessionRepository;
         this.outlookService = outlookService;
 	}
 
@@ -112,9 +116,12 @@ public class CourseService {
         validateTeacher(user);
         validateCourseOwner(course, user);
 
+        //Delete all sessions
+        sessionRepository.deleteByCourseId(courseId);
+
         courseRepository.delete(course);
 
-        log.debug("Deletec course: {}", course);    
+        log.debug("Delete course: {}", course);
     
     }
    

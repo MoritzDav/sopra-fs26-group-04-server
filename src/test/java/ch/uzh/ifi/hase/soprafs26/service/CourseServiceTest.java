@@ -4,6 +4,7 @@ import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,12 @@ public class CourseServiceTest {
  
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private SessionRepository sessionRepository;
+
+    @Mock
+    private OutlookService outlookService;
  
     @InjectMocks
     private CourseService courseService;
@@ -184,6 +191,22 @@ public class CourseServiceTest {
         verify(courseRepository, never()).save(any());
     }
 
+    @Test
+    public void newCourse_tokenUserMismatch_throwsForbidden() {
+        // given
+        Course input = new Course();
+        input.setTitle("Test Course");
+
+        when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+
+        // when & then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.newCourse(input, 2L, "valid-token"));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        verify(courseRepository, never()).save(any());
+    }
 
     /**
      * updateCourse
@@ -316,12 +339,14 @@ public class CourseServiceTest {
         //given
         when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        doNothing().when(sessionRepository).deleteByCourseId(10L);
 
         //when
         courseService.deleteCourse(10L, "valid-token");
 
         // then
         verify(courseRepository).delete(course);
+        verify(sessionRepository).deleteByCourseId(10L);
     }
     
     @Test
@@ -367,6 +392,98 @@ public class CourseServiceTest {
         //then
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
         verify(courseRepository, never()).delete(any());
+    }
+
+    /**
+     * Generate QR Code
+     */
+
+    @Test
+    public void generateQRCode_validTeacher_returnsBytes() {
+        // given
+        when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
+        course.setTeacher(teacher);
+        course.setCourseCode("ABC123");
+
+        // when
+        byte[] result = courseService.generateQRCode(course, "valid-token");
+
+        // then
+        assertNotNull(result);
+        assertTrue(result.length > 0);
+    }
+
+    @Test
+    public void generateQRCode_invalidToken_throwsUnauthorized() {
+        // given
+        when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
+
+        // when & then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.generateQRCode(course, "invalid-token"));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+    }
+
+    @Test
+    public void generateQRCode_notOwner_throwsForbidden() {
+        // given
+        when(userRepository.findByToken("other-token")).thenReturn(Optional.of(otherUser));
+        course.setTeacher(teacher);
+
+        // when & then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.generateQRCode(course, "other-token"));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+    }
+
+
+    /**
+     * Email preview
+     */
+
+    @Test
+    public void generateCourseEmailPreview_validTeacher_returnsEmail() {
+        // given
+        when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
+        course.setTeacher(teacher);
+        when(outlookService.generateCourseEmailPreview(course)).thenReturn("<html>Email</html>");
+
+        // when
+        String result = courseService.generateCourseEmailPreview(course, "valid-token");
+
+        // then
+        assertNotNull(result);
+        assertEquals("<html>Email</html>", result);
+        verify(outlookService).generateCourseEmailPreview(course);
+    }
+
+    @Test
+    public void generateCourseEmailPreview_invalidToken_throwsUnauthorized() {
+        // given
+        when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
+
+        // when & then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.generateCourseEmailPreview(course, "invalid-token"));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+        verify(outlookService, never()).generateCourseEmailPreview(any());
+    }
+
+    @Test
+    public void generateCourseEmailPreview_notOwner_throwsForbidden() {
+        // given
+        when(userRepository.findByToken("other-token")).thenReturn(Optional.of(otherUser));
+        course.setTeacher(teacher);
+
+        // when & then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.generateCourseEmailPreview(course, "other-token"));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        verify(outlookService, never()).generateCourseEmailPreview(any());
     }
 
 }
