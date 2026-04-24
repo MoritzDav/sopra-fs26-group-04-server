@@ -167,9 +167,9 @@ public class CourseService {
         try {
             // Create a URL that points to the course page
             String courseUrl = String.format(
-                "%s/courses/%d",
-                baseUrl,
-                course.getId()
+                    "%s/joinCourse?code=%s",
+                    baseUrl,
+                    course.getCourseCode()
             );
 
             QRCodeWriter qrCodeWriter = new QRCodeWriter();
