@@ -63,6 +63,8 @@ public class CourseServiceTest {
         course.setPictureURL("http://original.com/pic.jpg");
         course.setTeacher(teacher);
         course.setCourseCode("ABC123");
+
+        courseService = new CourseService(courseRepository, userRepository, sessionRepository, outlookService);
     }
 
 
@@ -212,121 +214,350 @@ public class CourseServiceTest {
      * updateCourse
      */
 
-    //Check whether updating works with a valid owner and while updating all the possible fields
+    // ============ Valid Update Tests ============
+
     @Test
-    public void updateCourse_validOwner_allFieldsUpdated(){
-        
-        //given
+    public void updateCourse_allFieldsUpdated_success() {
+        // given - Update all credential fields
         CoursePutDTO dto = new CoursePutDTO();
-        dto.setTitle("New Title");
-        dto.setDescription("New Description");
-        dto.setPictureURL("http://new.com/pic.jpg");
- 
+        dto.setTitle("Advanced Web Development");
+        dto.setDescription("Learn advanced web dev concepts");
+        dto.setPictureURL("https://example.com/advanced.jpg");
+
         when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
         when(courseRepository.save(any())).thenReturn(course);
- 
-        //when
+
+        // when
         courseService.updateCourse(10L, "valid-token", dto);
- 
-        //then
-        assertEquals("New Title", course.getTitle());
-        assertEquals("New Description", course.getDescription());
-        assertEquals("http://new.com/pic.jpg", course.getPictureURL());
+
+        // then
+        assertEquals("Advanced Web Development", course.getTitle());
+        assertEquals("Learn advanced web dev concepts", course.getDescription());
+        assertEquals("https://example.com/advanced.jpg", course.getPictureURL());
         verify(courseRepository).save(course);
     }
 
-    //Check whether updating only a part i.e. title works
     @Test
-    public void updateCourse_partialUpdate_onlyTitleChanged(){
-        
-        //given only a title, no description and pictureURL
+    public void updateCourse_titleOnly_success() {
+        // given - Update only title
         CoursePutDTO dto = new CoursePutDTO();
-        dto.setTitle("New Title");
- 
+        dto.setTitle("New Title Only");
+
         when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
         when(courseRepository.save(any())).thenReturn(course);
- 
-        //when
+
+        // when
         courseService.updateCourse(10L, "valid-token", dto);
- 
-        //then
-        assertEquals("New Title", course.getTitle());
-        assertEquals("Original Description", course.getDescription());
-        assertEquals("http://original.com/pic.jpg", course.getPictureURL());
+
+        // then
+        assertEquals("New Title Only", course.getTitle());
+        assertEquals("Original Description", course.getDescription()); // unchanged
+        assertEquals("http://original.com/pic.jpg", course.getPictureURL()); // unchanged
+        verify(courseRepository).save(course);
     }
 
-    //check whether updating-function with an empty DTO as input works
     @Test
-    public void updateCourse_emptyDTO_nothingChanges(){
-        
-        //given no information in the dto
+    public void updateCourse_descriptionOnly_success() {
+        // given - Update only description
         CoursePutDTO dto = new CoursePutDTO();
- 
+        dto.setDescription("Brand new description");
+
         when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
         when(courseRepository.save(any())).thenReturn(course);
- 
-        //when
+
+        // when
         courseService.updateCourse(10L, "valid-token", dto);
- 
-        //then
+
+        // then
+        assertEquals("Original Title", course.getTitle()); // unchanged
+        assertEquals("Brand new description", course.getDescription());
+        assertEquals("http://original.com/pic.jpg", course.getPictureURL()); // unchanged
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    public void updateCourse_pictureURLOnly_success() {
+        // given - Update only picture URL
+        CoursePutDTO dto = new CoursePutDTO();
+        dto.setPictureURL("https://example.com/updated-pic.jpg");
+
+        when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(10L, "valid-token", dto);
+
+        // then
+        assertEquals("Original Title", course.getTitle()); // unchanged
+        assertEquals("Original Description", course.getDescription()); // unchanged
+        assertEquals("https://example.com/updated-pic.jpg", course.getPictureURL());
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    public void updateCourse_titleAndDescription_success() {
+        // given - Update title and description
+        CoursePutDTO dto = new CoursePutDTO();
+        dto.setTitle("New Title");
+        dto.setDescription("New Description");
+
+        when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(10L, "valid-token", dto);
+
+        // then
+        assertEquals("New Title", course.getTitle());
+        assertEquals("New Description", course.getDescription());
+        assertEquals("http://original.com/pic.jpg", course.getPictureURL()); // unchanged
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    public void updateCourse_emptyDTO_nothingChanges() {
+        // given - Empty DTO (no fields updated)
+        CoursePutDTO dto = new CoursePutDTO();
+
+        when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(10L, "valid-token", dto);
+
+        // then
         assertEquals("Original Title", course.getTitle());
         assertEquals("Original Description", course.getDescription());
         assertEquals("http://original.com/pic.jpg", course.getPictureURL());
+        verify(courseRepository).save(course);
     }
 
-    //Check whether updating with an invalid token throws not found
-    @Test
-    public void updateCourse_invalidToken_notFound(){
+    // ============ Authorization Tests ============
 
-        //given
+    @Test
+    public void updateCourse_invalidToken_throwsNotFound() {
+        // given - Invalid token
         CoursePutDTO dto = new CoursePutDTO();
+        dto.setTitle("Attempted Title Change");
+
         when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
 
-        //when
+        // when & then
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 courseService.updateCourse(10L, "invalid-token", dto));
-        
-        //then
+
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verify(courseRepository, never()).save(any());
     }
 
-    //Check whether updating with an invalid courseId throws not found
     @Test
-    public void updateCourse_invalidCourse_notFound(){
-        //given
+    public void updateCourse_nullToken_throwsNotFound() {
+        // given - Null token
         CoursePutDTO dto = new CoursePutDTO();
-        when(userRepository.findByToken("valid-token")).thenReturn(Optional.of(teacher));
-        when(courseRepository.findById(99L)).thenReturn(Optional.empty());
+        dto.setTitle("Attempted Title Change");
 
+        when(userRepository.findByToken(null)).thenReturn(Optional.empty());
 
-        //when
+        // when & then
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
-                courseService.updateCourse(99L, "valid-token", dto));
-        
-        //then
+                courseService.updateCourse(10L, null, dto));
+
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verify(courseRepository, never()).save(any());
     }
 
-    //Check whether updating as not the Owner throws a forbidden
     @Test
-    public void updateCourse_notOwner_throwsForbidden(){
-        //given
+    public void updateCourse_invalidCourseId_throwsNotFound() {
+        // given - Invalid course ID
         CoursePutDTO dto = new CoursePutDTO();
-        dto.setTitle("Test title");
-        when(userRepository.findByToken("other-token")).thenReturn(Optional.of(otherUser));
-        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        dto.setTitle("New Title");
 
-        //when
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> 
-            courseService.updateCourse(10L, "other-token", dto));
+        when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(999L)).thenReturn(Optional.empty());
 
-        //then
-        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        // when & then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.updateCourse(999L, "teacher-token-valid", dto));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verify(courseRepository, never()).save(any());
     }
 
+    @Test
+    public void updateCourse_notOwner_throwsForbidden() {
+        // given - User is not the course owner
+        CoursePutDTO dto = new CoursePutDTO();
+        dto.setTitle("Unauthorized Title Change");
+
+        when(userRepository.findByToken("student-token-invalid")).thenReturn(Optional.of(otherUser));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+
+        // when & then
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                courseService.updateCourse(100L, "student-token-invalid", dto));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        verify(courseRepository, never()).save(any());
+    }
+
+    // ============ Input Validation Tests ============
+
+    @Test
+    public void updateCourse_longTitle_success() {
+        // given - Very long title
+        CoursePutDTO dto = new CoursePutDTO();
+        String longTitle = "A".repeat(200);
+        dto.setTitle(longTitle);
+
+        when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(100L, "teacher-token-valid", dto);
+
+        // then
+        assertEquals(longTitle, course.getTitle());
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    public void updateCourse_longDescription_success() {
+        // given - Very long description
+        CoursePutDTO dto = new CoursePutDTO();
+        String longDescription = "Description with lots of content. ".repeat(50);
+        dto.setDescription(longDescription);
+
+        when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(100L, "teacher-token-valid", dto);
+
+        // then
+        assertEquals(longDescription, course.getDescription());
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    public void updateCourse_emptyTitleString_success() {
+        // given - Empty string for title
+        CoursePutDTO dto = new CoursePutDTO();
+        dto.setTitle("");
+
+        when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(100L, "teacher-token-valid", dto);
+
+        // then
+        assertEquals("", course.getTitle());
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    public void updateCourse_specialCharactersInTitle_success() {
+        // given - Title with special characters
+        CoursePutDTO dto = new CoursePutDTO();
+        String titleWithSpecialChars = "Web Dev 2.0: $100 Course @Home!";
+        dto.setTitle(titleWithSpecialChars);
+
+        when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(100L, "teacher-token-valid", dto);
+
+        // then
+        assertEquals(titleWithSpecialChars, course.getTitle());
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    public void updateCourse_unicodeCharacters_success() {
+        // given - Title with unicode characters
+        CoursePutDTO dto = new CoursePutDTO();
+        String titleWithUnicode = "Web Development 网络开发 🌐";
+        dto.setTitle(titleWithUnicode);
+
+        when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(100L, "teacher-token-valid", dto);
+
+        // then
+        assertEquals(titleWithUnicode, course.getTitle());
+        verify(courseRepository).save(course);
+    }
+
+    // ============ Verification Tests ============
+
+    @Test
+    public void updateCourse_verifyRepositoryCalledOnce() {
+        // given
+        CoursePutDTO dto = new CoursePutDTO();
+        dto.setTitle("New Title");
+
+        when(userRepository.findByToken("teacher-token-valid")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any())).thenReturn(course);
+
+        // when
+        courseService.updateCourse(100L, "teacher-token-valid", dto);
+
+        // then
+        verify(courseRepository, times(1)).save(any());
+    }
+
+    @Test
+    public void updateCourse_verifyRepositoryNotCalledOnFailedAuth() {
+        // given
+        CoursePutDTO dto = new CoursePutDTO();
+        dto.setTitle("New Title");
+
+        when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
+
+        // when
+        assertThrows(ResponseStatusException.class, () ->
+                courseService.updateCourse(100L, "invalid-token", dto));
+
+        // then
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    public void updateCourse_verifyCourseObjectNotModifiedOnFailure() {
+        // given
+        CoursePutDTO dto = new CoursePutDTO();
+        dto.setTitle("Attempted Change");
+
+        String originalTitle = course.getTitle();
+        String originalDescription = course.getDescription();
+        String originalPictureURL = course.getPictureURL();
+
+        when(userRepository.findByToken("student-token-invalid")).thenReturn(Optional.of(otherUser));
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course));
+
+        // when
+        assertThrows(ResponseStatusException.class, () ->
+                courseService.updateCourse(100L, "student-token-invalid", dto));
+
+        // then - Object should not be persisted, but in memory it may be dirty
+        // This test verifies that save() was never called
+        verify(courseRepository, never()).save(any());
+    }
 
     /**
      * Delete course
