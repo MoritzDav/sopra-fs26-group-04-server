@@ -1,6 +1,7 @@
 package ch.uzh.ifi.hase.soprafs26.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ch.uzh.ifi.hase.soprafs26.entity.Session;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionGetDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.WhiteboardStateDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 import ch.uzh.ifi.hase.soprafs26.service.SessionService;
 
@@ -46,5 +48,22 @@ public class SessionController{
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void endSession(@PathVariable Long courseId, @PathVariable Long sessionId, @RequestHeader("Authorization") String token) {
         sessionService.endSession(sessionId, token);
+    }
+
+    @GetMapping("/courses/{courseId}/sessions/{sessionId}/whiteboard")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public WhiteboardStateDTO getWhiteboardState(@PathVariable Long courseId, @PathVariable Long sessionId) {
+        return sessionService.getWhiteboardState(sessionId);
+    }
+
+    @PutMapping("/courses/{courseId}/sessions/{sessionId}/whiteboard")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveWhiteboardState(
+            @PathVariable Long courseId,
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token,
+            @RequestBody WhiteboardStateDTO dto) {
+        sessionService.saveWhiteboardState(sessionId, token, dto.getCanvasSnapshot());
     }
 }

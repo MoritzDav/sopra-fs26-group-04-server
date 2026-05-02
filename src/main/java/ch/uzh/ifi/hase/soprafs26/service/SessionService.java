@@ -13,9 +13,11 @@ import org.springframework.web.server.ResponseStatusException;
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.WhiteboardPageRepository;
 import ch.uzh.ifi.hase.soprafs26.constant.SessionMode;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.*;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.WhiteboardStateDTO;
 
 @Service
 @Transactional
@@ -26,13 +28,16 @@ public class SessionService {
     private final SessionRepository sessionRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final WhiteboardPageRepository whiteboardPageRepository;
 
     public SessionService(@Qualifier("sessionRepository") SessionRepository sessionRepository,
                           @Qualifier("courseRepository") CourseRepository courseRepository,
-                          @Qualifier("userRepository") UserRepository userRepository) {
+                          @Qualifier("userRepository") UserRepository userRepository,
+                          @Qualifier("whiteboardPageRepository") WhiteboardPageRepository whiteboardPageRepository) {
         this.sessionRepository = sessionRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.whiteboardPageRepository = whiteboardPageRepository;
     }
 
 
@@ -91,6 +96,43 @@ public class SessionService {
         log.debug("Created session: {}", session.getSessionId());
         return session;
 
+    }
+
+    public WhiteboardStateDTO getWhiteboardState(Long sessionId) {
+        Session session = sessionRepository.findById(sessionId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+
+        WhiteboardStateDTO dto = new WhiteboardStateDTO();
+        TeacherWhiteboard wb = session.getTeacherWhiteboard();
+        if (wb != null && wb.getCurrentPage() != null) {
+            dto.setCanvasSnapshot(wb.getCurrentPage().getCanvasSnapshot());
+        }
+        return dto;
+    }
+
+    public void saveWhiteboardState(Long sessionId, String token, String canvasSnapshot) {
+        User user = userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        if (user.getRole() != UserRole.TEACHER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only teachers can save whiteboard state");
+        }
+
+        Session session = sessionRepository.findById(sessionId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+
+        if (!session.getCourse().getTeacher().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the teacher of this session");
+        }
+
+        TeacherWhiteboard wb = session.getTeacherWhiteboard();
+        if (wb == null || wb.getCurrentPage() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Whiteboard page not found");
+        }
+
+        WhiteboardPage page = wb.getCurrentPage();
+        page.setCanvasSnapshot(canvasSnapshot);
+        whiteboardPageRepository.save(page);
     }
 
     //End session
