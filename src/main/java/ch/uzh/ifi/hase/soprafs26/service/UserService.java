@@ -10,11 +10,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
+import ch.uzh.ifi.hase.soprafs26.entity.Course;
+import ch.uzh.ifi.hase.soprafs26.entity.CourseEnrollment;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.repository.CourseEnrollmentRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPutDTO;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -31,18 +36,19 @@ public class UserService {
 	private final Logger log = LoggerFactory.getLogger(UserService.class);
 
 	private final UserRepository userRepository;
+	private final CourseRepository courseRepository;
+	private final CourseEnrollmentRepository courseEnrollmentRepository;
 
-	public UserService(@Qualifier("userRepository") UserRepository userRepository) {
+	public UserService(@Qualifier("userRepository") UserRepository userRepository,
+					@Qualifier("courseRepository") CourseRepository courseRepository,
+					@Qualifier("courseEnrollmentRepository") CourseEnrollmentRepository courseEnrollmentRepository) {
 		this.userRepository = userRepository;
+		this.courseRepository = courseRepository;
+		this.courseEnrollmentRepository = courseEnrollmentRepository;
 	}
 
 	public List<User> getUsers() {
 		return this.userRepository.findAll();
-	}
-
-	public User getUserById(Long id) {
-		return userRepository.findById(id)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 	}
 
 	public User loginUser(String username, String password) {
@@ -57,7 +63,8 @@ public class UserService {
 			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
 		}
 		
-		// Set status to ONLINE
+		// Generate new token and set status to ONLINE
+		user.setToken(UUID.randomUUID().toString());
 		user.setStatus(UserStatus.ONLINE);
 		user = userRepository.save(user);
 		userRepository.flush();
@@ -66,22 +73,19 @@ public class UserService {
 		return user;
 	}
 
-	public User logoutUser(Long id, Long requestingUserId) {
-		// Check ownership: only the user can logout themselves
-		if (!id.equals(requestingUserId)) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only logout your own account");
-		}
+	public User logoutUser(String token) {
 		
-		User user = userRepository.findById(id)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+		//Fetch user via token
+		User user = getUserByToken(token);
 		
 		user.setStatus(UserStatus.OFFLINE);
 		user = userRepository.save(user);
 		userRepository.flush();
 		
-		log.debug("User {} logged out", id);
+		log.debug("User {} logged out", user.getId());
 		return user;
 	}
+	
 	public User createUser(User newUser) {
 		newUser.setToken(UUID.randomUUID().toString());
 		
@@ -136,6 +140,30 @@ public class UserService {
 		return user;
 	}
 
+	public List<Course> getCoursesByUser(Long id, String token) {
+
+		//Validate the token, no matching due to possible functionality and fetching user via Id also because of functionality, teacher might want to see students courses
+		getUserByToken(token);
+		
+		//Fetch user
+		User user = userRepository.findById(id)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+		//Different methodes for fetching the courses depending on user role
+		if (user.getRole() == UserRole.TEACHER){
+			return courseRepository.findByTeacherId(user.getId());
+		} else {
+			List<CourseEnrollment> enrollments = courseEnrollmentRepository.findByStudentId(user.getId());
+			List<Course> courses = new ArrayList<>();
+			for (CourseEnrollment enrollment : enrollments){
+				Course course = courseRepository.findById(enrollment.getCourseId())
+					.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+				courses.add(course);
+			}
+			return courses;
+		}
+	}
+
 	/**
 	 * This is a helper method that will check the uniqueness criteria of the
 	 * username and the name
@@ -153,4 +181,18 @@ public class UserService {
         }
     }
 
+
+	//Helper functions for the checks
+
+    //Fetch user via token including validation
+    private User getUserByToken(String token){
+        return userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+    }
+
+	//Fetch user via Id
+	public User getUserById(Long id) {
+    return userRepository.findById(id)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+	}
 }

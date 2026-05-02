@@ -46,10 +46,10 @@ public class CourseEnrollmentService {
      * - Course code exists
      * - Student is not already enrolled
      */
-    public CourseEnrollment enrollStudentByCourseCode(Long studentId, String courseCode) {
-        // Validate student exists
-        User student = userRepository.findById(studentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
+    public CourseEnrollment enrollStudentByCourseCode(String token, String courseCode) {
+        // Fetch student via token and validate
+        User student = userRepository.findByToken(token)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
 
         // Validate student role
         if (student.getRole() != UserRole.STUDENT) {
@@ -63,27 +63,30 @@ public class CourseEnrollmentService {
         }
 
         // Check if already enrolled
-        if (isStudentEnrolled(studentId, course.getId())) {
+        if (isStudentEnrolled(student.getId(), course.getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Student is already enrolled in this course");
         }
 
         // Create enrollment
         CourseEnrollment enrollment = new CourseEnrollment();
-        enrollment.setStudentId(studentId);
+        enrollment.setStudentId(student.getId());
         enrollment.setCourseId(course.getId());
         enrollment.setJoinedDate(LocalDateTime.now());
 
         enrollment = courseEnrollmentRepository.save(enrollment);
         courseEnrollmentRepository.flush();
 
-        log.debug("Student {} enrolled in course {} ({})", studentId, course.getId(), courseCode);
+        log.debug("Student {} enrolled in course {} ({})", student.getId(), course.getId(), courseCode);
         return enrollment;
     }
 
     /**
      * Get all students enrolled in a course
      */
-    public List<CourseEnrollment> getStudentsInCourse(Long courseId) {
+    public List<CourseEnrollment> getStudentsInCourse(Long courseId, String token) {
+        //validate token
+        userRepository.findByToken(token).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+        
         // Validate course exists
         courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));

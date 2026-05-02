@@ -2,6 +2,9 @@ package ch.uzh.ifi.hase.soprafs26.entity;
 
 import java.io.Serializable;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import jakarta.persistence.*;
 
 
@@ -24,12 +27,15 @@ public class Course implements Serializable {
     @Column(nullable = false, unique = true)
     private String courseCode;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String pictureURL;
 
 	@ManyToOne
     @JoinColumn(name = "teacher_id",nullable = false)
     private User teacher;
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Session> sessions = new ArrayList<>();
 
 
     public Long getId() {
@@ -64,7 +70,6 @@ public class Course implements Serializable {
 		this.courseCode = courseCode;
 	}
 
-
 	public String getPictureURL() {
 		return pictureURL;
 	}
@@ -80,5 +85,5 @@ public class Course implements Serializable {
 	public void setTeacher(User teacher) {
 		this.teacher = teacher;
 	}
-	
+
 }

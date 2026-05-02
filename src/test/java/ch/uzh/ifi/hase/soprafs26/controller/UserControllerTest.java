@@ -5,9 +5,10 @@ import tools.jackson.databind.ObjectMapper;
 
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
-import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.entity.*;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserLoginDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPostDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPutDTO;
 import ch.uzh.ifi.hase.soprafs26.service.UserService;
 
 import org.junit.jupiter.api.Test;
@@ -22,9 +23,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -224,9 +226,101 @@ public class UserControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    /**
+     * PUT /users/{id}
+     */
+
+    //Update user with a valid request
+    @Test
+    public void updateUser_validRequest_returns200() throws Exception {
+        // given
+        UserPutDTO dto = new UserPutDTO();
+        dto.setFirstName("NewName");
+
+        User updatedUser = new User();
+        updatedUser.setId(1L);
+        updatedUser.setFirstName("NewName");
+        updatedUser.setLastName("Wonder");
+        updatedUser.setUsername("alice");
+        updatedUser.setToken("some-token");
+        updatedUser.setStatus(UserStatus.ONLINE);
+        updatedUser.setRole(UserRole.STUDENT);
+
+        given(userService.updateUser(eq(1L), any(UserPutDTO.class))).willReturn(updatedUser);
+
+        // when
+        MockHttpServletRequestBuilder request = put("/users/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(dto));
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName", is("NewName")));
+    }
+
+
+    //Update user with an invalid
+    @Test
+    public void updateUser_userNotFound_returns404() throws Exception {
+        // given
+        UserPutDTO dto = new UserPutDTO();
+        dto.setFirstName("NewName");
+
+        given(userService.updateUser(eq(99L), any(UserPutDTO.class)))
+                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        // when
+        MockHttpServletRequestBuilder request = put("/users/99")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(dto));
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void updateUser_conflictingUsername_returns409() throws Exception {
+        // given
+        UserPutDTO dto = new UserPutDTO();
+        dto.setUsername("existinguser");
+
+        given(userService.updateUser(eq(1L), any(UserPutDTO.class)))
+                .willThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists!"));
+
+        // when
+        MockHttpServletRequestBuilder request = put("/users/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(dto));
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    public void updateUser_wrongPassword_returns401() throws Exception {
+        // given
+        UserPutDTO dto = new UserPutDTO();
+        dto.setOldPassword("wrongpassword");
+        dto.setNewPassword("newpassword");
+
+        given(userService.updateUser(eq(1L), any(UserPutDTO.class)))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Current password is incorrect"));
+
+        // when
+        MockHttpServletRequestBuilder request = put("/users/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(dto));
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
 
     /**
-     * POST /users/{id}/logout
+     * POST /users/logout
      */
 
     @Test
@@ -241,11 +335,11 @@ public class UserControllerTest {
         loggedOut.setStatus(UserStatus.OFFLINE);
         loggedOut.setRole(UserRole.STUDENT);
 
-        given(userService.logoutUser(1L, 1L)).willReturn(loggedOut);
+        given(userService.logoutUser("some-token")).willReturn(loggedOut);
 
         // when
-        MockHttpServletRequestBuilder request = post("/users/1/logout")
-                .param("requestingUserId", "1");
+        MockHttpServletRequestBuilder request = post("/users/logout")
+                .header("Authorization", "some-token");
 
         // then
         mockMvc.perform(request)
@@ -254,29 +348,75 @@ public class UserControllerTest {
     }
 
     @Test
-    public void logoutUser_differentUser_returns403() throws Exception {
+    public void logoutUser_invalidToken_returns404() throws Exception {
         // given
-        given(userService.logoutUser(eq(1L), eq(2L)))
-                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only logout your own account"));
+        given(userService.logoutUser("invalid-token"))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You can only logout your own account"));
 
         // when
-        MockHttpServletRequestBuilder request = post("/users/1/logout")
-                .param("requestingUserId", "2");
+        MockHttpServletRequestBuilder request = post("/users/logout")
+                .header("Authorization", "invalid-token");
 
         // then
         mockMvc.perform(request)
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * GET /users/{id}/courses
+     */
+
+
+    @Test
+    public void getUserCourses_validRequest_returns200() throws Exception {
+        // given
+        User teacher = new User();
+        teacher.setId(1L);
+
+        Course course = new Course();
+        course.setId(10L);
+        course.setTitle("Math 101");
+        course.setCourseCode("XYZ999");
+        course.setTeacher(teacher);
+
+        given(userService.getCoursesByUser(eq(1L), eq("some-token")))
+                .willReturn(java.util.List.of(course));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/users/1/courses")
+                .header("Authorization", "some-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id", is(10)))
+                .andExpect(jsonPath("$[0].title", is("Math 101")));
     }
 
     @Test
-    public void logoutUser_userNotFound_returns404() throws Exception {
+    public void getUserCourses_invalidToken_returns401() throws Exception {
         // given
-        given(userService.logoutUser(eq(99L), eq(99L)))
+        given(userService.getCoursesByUser(eq(1L), eq("invalid-token")))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        // when
+        MockHttpServletRequestBuilder request = get("/users/1/courses")
+                .header("Authorization", "invalid-token");
+
+        // then
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    public void getUserCourses_userNotFound_returns404() throws Exception {
+        // given
+        given(userService.getCoursesByUser(eq(99L), eq("some-token")))
                 .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         // when
-        MockHttpServletRequestBuilder request = post("/users/99/logout")
-                .param("requestingUserId", "99");
+        MockHttpServletRequestBuilder request = get("/users/99/courses")
+                .header("Authorization", "some-token");
 
         // then
         mockMvc.perform(request)
@@ -284,6 +424,8 @@ public class UserControllerTest {
     }
 
 
+
+    //Helper function
     private String asJsonString(final Object object) {
         try {
             return new ObjectMapper().writeValueAsString(object);

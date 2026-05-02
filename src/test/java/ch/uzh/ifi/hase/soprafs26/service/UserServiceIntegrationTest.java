@@ -186,7 +186,7 @@ public class UserServiceIntegrationTest {
 		assertEquals(UserStatus.ONLINE, createdUser.getStatus());
 
 		// when
-		User loggedOutUser = userService.logoutUser(createdUser.getId(), createdUser.getId());
+		User loggedOutUser = userService.logoutUser(createdUser.getToken());
 
 		// then
 		assertEquals(UserStatus.OFFLINE, loggedOutUser.getStatus());
@@ -197,40 +197,10 @@ public class UserServiceIntegrationTest {
 	}
 
 	@Test
-	public void logoutUser_ownershipCheck_throwsException() {
-		// given
-		User user1 = new User();
-		user1.setFirstName("User");
-		user1.setLastName("One");
-		user1.setUsername("user_one");
-		user1.setPassword("pass1");
-
-		User user2 = new User();
-		user2.setFirstName("User");
-		user2.setLastName("Two");
-		user2.setUsername("user_two");
-		user2.setPassword("pass2");
-
-		User created1 = userService.createUser(user1);
-		User created2 = userService.createUser(user2);
-
-		// when & then - User 1 trying to logout User 2
-		assertThrows(ResponseStatusException.class,
-				() -> userService.logoutUser(created2.getId(), created1.getId()));
-
-		// Verify user 2 is still ONLINE
-		User user2AfterAttempt = userService.getUserById(created2.getId());
-		assertEquals(UserStatus.ONLINE, user2AfterAttempt.getStatus());
-	}
-
-	@Test
-	public void logoutUser_nonexistentUser_throwsException() {
-		// given
-		Long nonexistentId = 9999L;
+	public void logoutUser_invalidToken_throwsException() {
 
 		// when & then
-		assertThrows(ResponseStatusException.class,
-				() -> userService.logoutUser(nonexistentId, nonexistentId));
+		assertThrows(ResponseStatusException.class, () -> userService.logoutUser("invalid-token"));
 	}
 
 	// ============ Login User Tests ============
@@ -248,7 +218,7 @@ public class UserServiceIntegrationTest {
 		Long userId = createdUser.getId();
 
 		// Logout first to set OFFLINE
-		userService.logoutUser(userId, userId);
+		userService.logoutUser(createdUser.getToken());
 		User offlineUser = userService.getUserById(userId);
 		assertEquals(UserStatus.OFFLINE, offlineUser.getStatus());
 
@@ -342,7 +312,7 @@ public class UserServiceIntegrationTest {
 	}
 
 	@Test
-	public void loginUser_tokenRemainsSame() {
+	public void loginUser_tokenChangesWhenLogin() {
 		// given
 		User testUser = new User();
 		testUser.setFirstName("Login");
@@ -354,13 +324,14 @@ public class UserServiceIntegrationTest {
 		String originalToken = createdUser.getToken();
 
 		// Logout to set OFFLINE
-		userService.logoutUser(createdUser.getId(), createdUser.getId());
+		userService.logoutUser(originalToken);
 
 		// when
 		User loggedInUser = userService.loginUser("logintokentest", "password123");
 
 		// then
-		assertEquals(originalToken, loggedInUser.getToken());
+		assertNotEquals(originalToken, loggedInUser.getToken());
+    	assertNotNull(loggedInUser.getToken());
 	}
 
 	@Test
@@ -376,7 +347,7 @@ public class UserServiceIntegrationTest {
 		String originalToken = createdUser.getToken();
 
 		// when
-		User loggedOutUser = userService.logoutUser(createdUser.getId(), createdUser.getId());
+		User loggedOutUser = userService.logoutUser(originalToken);
 
 		// then
 		assertEquals(originalToken, loggedOutUser.getToken());
@@ -393,25 +364,24 @@ public class UserServiceIntegrationTest {
 
 		User createdUser = userService.createUser(testUser);
 		assertEquals(UserStatus.ONLINE, createdUser.getStatus());
-		String token = createdUser.getToken();
+		String originalToken = createdUser.getToken();
 
 		// Logout
-		userService.logoutUser(createdUser.getId(), createdUser.getId());
+		userService.logoutUser(originalToken);
 		User offlineUser = userService.getUserById(createdUser.getId());
 		assertEquals(UserStatus.OFFLINE, offlineUser.getStatus());
-		assertEquals(token, offlineUser.getToken());
+		assertEquals(originalToken, offlineUser.getToken());
 
 		// when - Login again
 		User loggedInUser = userService.loginUser("statuschangetest", "password123");
 
 		// then
 		assertEquals(UserStatus.ONLINE, loggedInUser.getStatus());
-		assertEquals(token, loggedInUser.getToken());
+		assertNotEquals(originalToken, loggedInUser.getToken());
 
 		// Verify in DB
 		User verifiedUser = userService.getUserById(createdUser.getId());
 		assertEquals(UserStatus.ONLINE, verifiedUser.getStatus());
-		assertEquals(token, verifiedUser.getToken());
 	}
 
 	@Test
@@ -424,21 +394,20 @@ public class UserServiceIntegrationTest {
 		testUser.setPassword("password123");
 
 		User createdUser = userService.createUser(testUser);
+		assertEquals(UserStatus.ONLINE, createdUser.getStatus());
 		String token = createdUser.getToken();
-		Long userId = createdUser.getId();
 
 		// Logout first
-		userService.logoutUser(userId, userId);
+		userService.logoutUser(token);
 
 		// when - Login
 		User login1 = userService.loginUser("concurrenttest", "password123");
 		assertEquals(UserStatus.ONLINE, login1.getStatus());
-		assertEquals(token, login1.getToken());
+		assertNotEquals(token, login1.getToken());
 
 		// then - Token and user status should be consistent
-		User retrievedUser = userService.getUserById(userId);
+		User retrievedUser = userService.getUserById(createdUser.getId());
 		assertEquals(UserStatus.ONLINE, retrievedUser.getStatus());
-		assertEquals(token, retrievedUser.getToken());
 	}
 
 	@Test
@@ -451,20 +420,19 @@ public class UserServiceIntegrationTest {
 		testUser.setPassword("password123");
 
 		User createdUser = userService.createUser(testUser);
-		Long userId = createdUser.getId();
-		String token = createdUser.getToken();
+		String originalToken = createdUser.getToken();
 
 		// when
-		User retrievedBeforeLogout = userService.getUserById(userId);
-		userService.logoutUser(userId, userId);
-		User retrievedAfterLogout = userService.getUserById(userId);
+		User retrievedBeforeLogout = userService.getUserById(createdUser.getId());
+		userService.logoutUser(originalToken);
+		User retrievedAfterLogout = userService.getUserById(createdUser.getId());
 		userService.loginUser("retrievaltest", "password123");
-		User retrievedAfterLogin = userService.getUserById(userId);
+		User retrievedAfterLogin = userService.getUserById(createdUser.getId());
 
 		// then
-		assertEquals(token, retrievedBeforeLogout.getToken());
-		assertEquals(token, retrievedAfterLogout.getToken());
-		assertEquals(token, retrievedAfterLogin.getToken());
+		assertEquals(originalToken, retrievedBeforeLogout.getToken());
+		assertEquals(originalToken, retrievedAfterLogout.getToken());
+		assertNotEquals(originalToken, retrievedAfterLogin.getToken());
 	}
 
 }

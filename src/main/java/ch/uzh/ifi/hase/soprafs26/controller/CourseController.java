@@ -21,12 +21,10 @@ public class CourseController {
     
     private final CourseService courseService;
     private final CourseEnrollmentService courseEnrollmentService;
-    private final OutlookService outlookService;
 
 	CourseController(CourseService courseService, CourseEnrollmentService courseEnrollmentService, OutlookService outlookService) {
 		this.courseService = courseService;
 		this.courseEnrollmentService = courseEnrollmentService;
-		this.outlookService = outlookService;
 	}
 
 
@@ -34,9 +32,10 @@ public class CourseController {
 	@PostMapping("/courses")
 	@ResponseStatus(HttpStatus.CREATED)
 	@ResponseBody
-	public CourseGetDTO createCourse(@RequestBody CoursePostDTO coursePostDTO) {
+	public CourseGetDTO createCourse(@RequestBody CoursePostDTO coursePostDTO, 
+                                    @RequestHeader ("Authorization") String token) {
         Course courseInput = DTOMapper.INSTANCE.convertCoursePostDTOtoEntity(coursePostDTO);
-        Course createdCourse = courseService.newCourse(courseInput, coursePostDTO.getTeacherId());
+        Course createdCourse = courseService.newCourse(courseInput, coursePostDTO.getTeacherId(), token);
         return DTOMapper.INSTANCE.convertEntitiytoCourseGetDTO(createdCourse);
     }
 
@@ -54,8 +53,8 @@ public class CourseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @ResponseBody
     public void updateCourse(@PathVariable Long courseId, 
-        @RequestHeader ("Authorization") String token,
-        @RequestBody CoursePutDTO coursePutDTO) {
+                            @RequestHeader ("Authorization") String token,
+                            @RequestBody CoursePutDTO coursePutDTO) {
         courseService.updateCourse(courseId, token, coursePutDTO);
     }
 
@@ -64,42 +63,44 @@ public class CourseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @ResponseBody
     public void deleteCourse(@PathVariable Long courseId,
-        @RequestHeader ("Authorization") String token) {
+                            @RequestHeader ("Authorization") String token) {
         courseService.deleteCourse(courseId, token);
     }
 
     // Generates and returns a QR code image for a course.
     @GetMapping("/courses/{courseId}/qr")
     @ResponseStatus(HttpStatus.OK)
-    public byte[] getQRCode(@PathVariable Long courseId) {
+    public byte[] getQRCode(@PathVariable Long courseId, 
+                            @RequestHeader ("Authorization") String token) {
         Course course = courseService.getCourseById(courseId);
-        return courseService.generateQRCode(course);
+        return courseService.generateQRCode(course, token);
     }
 
     // Generates/previews a course invitation email (similar to QR code generation).
     @GetMapping("/courses/{courseId}/email")
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
-    public String generateCourseEmail(@PathVariable Long courseId) {
+    public String generateCourseEmail(@PathVariable Long courseId,
+                                      @RequestHeader ("Authorization") String token) {
         Course course = courseService.getCourseById(courseId);
-        return outlookService.generateCourseEmailPreview(course);
+        return courseService.generateCourseEmailPreview(course, token);
     }
 
     // Enrolls a student in a course using course code.
     @PostMapping("/courses/{courseCode}/enroll")
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
-    public CourseEnrollment enrollStudent(@PathVariable String courseCode, @RequestParam Long studentId) {
-        return courseEnrollmentService.enrollStudentByCourseCode(studentId, courseCode);
+    public CourseEnrollment enrollStudent(@PathVariable String courseCode, @RequestHeader("Authorization") String token) {
+        return courseEnrollmentService.enrollStudentByCourseCode(token, courseCode);
     }
 
     // Gets all students enrolled in a course.
     @GetMapping("/courses/{courseCode}/students")
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
-    public List<CourseEnrollment> getStudentsInCourse(@PathVariable String courseCode) {
+    public List<CourseEnrollment> getStudentsInCourse(@PathVariable String courseCode, @RequestHeader("Authorization") String token) {
         // Get course by code to verify it exists and get the ID
         Course course = courseService.getCourseByCourseCode(courseCode);
-        return courseEnrollmentService.getStudentsInCourse(course.getId());
+        return courseEnrollmentService.getStudentsInCourse(course.getId(), token);
     }
 }

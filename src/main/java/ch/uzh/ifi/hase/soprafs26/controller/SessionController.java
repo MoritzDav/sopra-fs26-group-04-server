@@ -1,16 +1,10 @@
 package ch.uzh.ifi.hase.soprafs26.controller;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.List;
 
 import ch.uzh.ifi.hase.soprafs26.entity.Session;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
@@ -42,6 +36,18 @@ public class SessionController{
 
         //return getDTO
         return DTOMapper.INSTANCE.convertSessionEntityToSessionGetDTO(session);
+    }
+
+    @GetMapping("courses/{courseId}/sessions")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public List<SessionGetDTO> getSessionsByCourse(@PathVariable Long courseId, @RequestHeader("Authorization") String token) {
+        List<Session> sessions = sessionService.getSessionsByCourse(courseId, token);
+        List<SessionGetDTO> sessionGetDTOs = new ArrayList<>();
+        for (Session session : sessions) {
+            sessionGetDTOs.add(DTOMapper.INSTANCE.convertSessionEntityToSessionGetDTO(session));
+        }
+        return sessionGetDTOs;
     }
 
     @PutMapping("/courses/{courseId}/sessions/{sessionId}/end")
