@@ -53,6 +53,11 @@ public class BrowniePointService {
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
 
+        //Validate student
+        if (student.getRole() != UserRole.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You can only award points to students");
+        }
+
         //Fetch the corresponding course
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
