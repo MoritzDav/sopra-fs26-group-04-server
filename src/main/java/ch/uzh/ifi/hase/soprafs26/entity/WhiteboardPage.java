@@ -19,6 +19,10 @@ public class WhiteboardPage implements Serializable{
     @Column
     private String backgroundFile;
 
+    @Lob
+    @Column
+    private String canvasSnapshot;
+
     @ManyToOne
     @JoinColumn(name = "whiteboard_id", nullable = false)
     private Whiteboard whiteboard;
@@ -45,6 +49,13 @@ public class WhiteboardPage implements Serializable{
     }
     public void setBackgroundFile(String backgroundFile) {
         this.backgroundFile = backgroundFile;
+    }
+
+    public String getCanvasSnapshot() {
+        return canvasSnapshot;
+    }
+    public void setCanvasSnapshot(String canvasSnapshot) {
+        this.canvasSnapshot = canvasSnapshot;
     }
 
     public Whiteboard getWhiteboard() {
