@@ -10,6 +10,7 @@ import ch.uzh.ifi.hase.soprafs26.entity.Session;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionGetDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.WhiteboardStateDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionBoardSelectDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 import ch.uzh.ifi.hase.soprafs26.service.SessionService;
 
@@ -72,4 +73,27 @@ public class SessionController{
             @RequestBody WhiteboardStateDTO dto) {
         sessionService.saveWhiteboardState(sessionId, token, dto.getCanvasSnapshot());
     }
+
+
+    //Teacher selects student whiteboard
+    @PutMapping("/courses/{courseId}/sessions/{sessionId}/selected-board")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void selectStudentBoard(
+            @PathVariable Long courseId,
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token,
+            @RequestBody SessionBoardSelectDTO dto) {
+        sessionService.selectStudentBoard(courseId, sessionId, token, dto.getStudentId());
+    }
+
+    //Teacher deselects student whiteboard
+    @PutMapping("/courses/{courseId}/sessions/{sessionId}/deselect-board")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deselectStudentBoard(
+            @PathVariable Long courseId,
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token){
+        sessionService.deselectStudentBoard(courseId, sessionId, token);
+    }
+
 }
