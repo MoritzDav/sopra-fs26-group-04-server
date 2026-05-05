@@ -87,8 +87,21 @@ public class UserService {
 	}
 	
 	public User createUser(User newUser) {
+		if (newUser.getUsername() == null || newUser.getUsername().isBlank()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username must not be empty");
+		}
+		if (newUser.getFirstName() == null || newUser.getFirstName().isBlank()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "First name must not be empty");
+		}
+		if (newUser.getLastName() == null || newUser.getLastName().isBlank()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Last name must not be empty");
+		}
+		if (newUser.getPassword() == null || newUser.getPassword().isBlank()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must not be empty");
+		}
+
 		newUser.setToken(UUID.randomUUID().toString());
-		
+
 		//We need to fix whether we need UserStatus and if we need to be automatically online
 		newUser.setStatus(UserStatus.ONLINE);
 
