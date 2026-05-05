@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import ch.uzh.ifi.hase.soprafs26.rest.SessionWebSocketHandler;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionBoardSelectDTO;
@@ -32,6 +33,7 @@ public class SessionService {
     private final ChatMessageService chatMessageService;
     private final CourseEnrollmentRepository courseEnrollmentRepository;
     private final SessionWebSocketHandler sessionWebSocketHandler;
+    private final PersonalWhiteboardRepository personalWhiteboardRepository;
 
 
     public SessionService(@Qualifier("sessionRepository") SessionRepository sessionRepository,
@@ -40,6 +42,7 @@ public class SessionService {
                           @Qualifier("whiteboardPageRepository") WhiteboardPageRepository whiteboardPageRepository,
                           @Qualifier("chatMessageService") ChatMessageService chatMessageService,
                           @Qualifier("courseEnrollmentRepository") CourseEnrollmentRepository courseEnrollmentRepository,
+                          @Qualifier("personalWhiteboardRepository") PersonalWhiteboardRepository personalWhiteboardRepository,
                           SessionWebSocketHandler sessionWebSocketHandler) {
         this.sessionRepository = sessionRepository;
         this.courseRepository = courseRepository;
@@ -47,6 +50,7 @@ public class SessionService {
         this.whiteboardPageRepository = whiteboardPageRepository;
         this.chatMessageService = chatMessageService;
         this.courseEnrollmentRepository = courseEnrollmentRepository;
+        this.personalWhiteboardRepository = personalWhiteboardRepository;
         this.sessionWebSocketHandler = sessionWebSocketHandler;
     }
 
@@ -95,6 +99,60 @@ public class SessionService {
         return session;
     }
 
+    //Join session as a student
+    public PersonalWhiteboard joinSession(Long courseId, Long sessionId, String token){
+
+        //Fetch user
+        User user = getUserByToken(token);
+        if (user.getRole() != UserRole.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can join a session");
+        }
+
+        //Fetch session
+        Session session = getSessionById(sessionId);
+        if (!session.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Session is not active");
+        }
+
+        boolean isEnrolled = courseEnrollmentRepository
+                .findByStudentIdAndCourseId(user.getId(), courseId).isPresent();
+
+        if (!isEnrolled){
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not enrolled in this course");
+        }
+
+        // Return existing whiteboard if already joined
+        Optional<PersonalWhiteboard> existing = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(user.getId(), sessionId);
+
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        // Create new PersonalWhiteboard
+        PersonalWhiteboard whiteboard = new PersonalWhiteboard();
+        whiteboard.setOwner(user);
+        whiteboard.setSession(session);
+        whiteboard.setLocked(false);
+        whiteboard.setTeacherLayerReadOnly(true);
+        whiteboard.setVisible(true);
+
+        WhiteboardPage firstPage = new WhiteboardPage();
+        firstPage.setPageNumber(1);
+        firstPage.setWhiteboard(whiteboard);
+
+        whiteboard.getPages().add(firstPage);
+        whiteboard.setCurrentPage(firstPage);
+
+        whiteboard = personalWhiteboardRepository.save(whiteboard);
+        personalWhiteboardRepository.flush();
+
+        log.debug("Student {} joined session {} and got whiteboard {}", user.getId(), sessionId, whiteboard.getWhiteboardId());
+        return whiteboard;
+
+    }
+
+
     public WhiteboardStateDTO getWhiteboardState(Long sessionId) {
         Session session = sessionRepository.findById(sessionId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
@@ -107,6 +165,7 @@ public class SessionService {
         return dto;
     }
 
+    //Save whiteboard as a teacher
     public void saveWhiteboardState(Long sessionId, String token, String canvasSnapshot) {
         User user = getUserByToken(token);
         validateTeacher(user);
@@ -122,6 +181,46 @@ public class SessionService {
         WhiteboardPage page = wb.getCurrentPage();
         page.setCanvasSnapshot(canvasSnapshot);
         whiteboardPageRepository.save(page);
+    }
+
+    //Save whiteboard as a student
+    public void savePersonalWhiteboardState(Long courseId, Long sessionId, String token, String canvasSnapshot) {
+        User user = getUserByToken(token);
+
+        if (user.getRole() != UserRole.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can save their own whiteboard");
+        }
+
+        getSessionById(sessionId);
+
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(user.getId(), sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Personal whiteboard not found"));
+
+        if (whiteboard.getCurrentPage() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Whiteboard page not found");
+        }
+
+        WhiteboardPage page = whiteboard.getCurrentPage();
+        page.setCanvasSnapshot(canvasSnapshot);
+        whiteboardPageRepository.save(page);
+
+        log.debug("Student {} saved personal whiteboard in session {}", user.getId(), sessionId);
+    }
+
+    //Teacher loads whiteboard of a student
+    public WhiteboardStateDTO getStudentWhiteboardState(Long sessionId, Long studentId) {
+        getSessionById(sessionId);
+
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(studentId, sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student whiteboard not found"));
+
+        WhiteboardStateDTO dto = new WhiteboardStateDTO();
+        if (whiteboard.getCurrentPage() != null) {
+            dto.setCanvasSnapshot(whiteboard.getCurrentPage().getCanvasSnapshot());
+        }
+        return dto;
     }
 
     //End session
@@ -173,7 +272,13 @@ public class SessionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected user is not a student");
         }
 
+        //Fetch whiteboard of the student from the DB
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(studentId, sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student whiteboard not found"));
+
         session.setMode(SessionMode.STUDENT);
+        session.setSelectedWhiteboard(whiteboard);
         sessionRepository.save(session);
         sessionRepository.flush();
 
@@ -181,12 +286,23 @@ public class SessionService {
         log.debug("Teacher selected student {} board in session {}", studentId, sessionId);
     }
 
-    public void deselectStudentBoard(Long courseId, Long sessionId, String token) {
+    //Deselect student whiteboard
+    public void deselectStudentBoard(Long courseId, Long sessionId, String token, Long studentId, String canvasSnapshot) {
         User user = getUserByToken(token);
         validateTeacher(user);
 
         Session session = getSessionById(sessionId);
         validateSessionOwner(session, user);
+
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(studentId, sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student whiteboard not found"));
+
+        if (whiteboard.getCurrentPage() != null) {
+            WhiteboardPage page = whiteboard.getCurrentPage();
+            page.setCanvasSnapshot(canvasSnapshot);
+            whiteboardPageRepository.save(page);
+        }
 
         session.setMode(SessionMode.NORMAL);
         session.setSelectedWhiteboard(null);

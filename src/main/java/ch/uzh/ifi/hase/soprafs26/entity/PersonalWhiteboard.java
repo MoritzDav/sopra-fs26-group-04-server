@@ -22,6 +22,11 @@ public class PersonalWhiteboard extends Whiteboard {
     @JoinColumn(name = "session_id", nullable = false)
     private Session session;
 
+    @OneToOne
+    @JoinColumn(name = "current_page_id")
+    private WhiteboardPage currentPage;
+
+
     // getters and setters
 
     public User getOwner() {
@@ -51,4 +56,7 @@ public class PersonalWhiteboard extends Whiteboard {
     public void setSession(Session session) {
         this.session = session;
     }
+
+    public WhiteboardPage getCurrentPage() { return currentPage; }
+    public void setCurrentPage(WhiteboardPage currentPage) { this.currentPage = currentPage; }
 }
