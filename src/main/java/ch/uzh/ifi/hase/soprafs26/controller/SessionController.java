@@ -1,5 +1,7 @@
 package ch.uzh.ifi.hase.soprafs26.controller;
 
+import ch.uzh.ifi.hase.soprafs26.entity.PersonalWhiteboard;
+import jakarta.persistence.PreUpdate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -7,9 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import ch.uzh.ifi.hase.soprafs26.entity.Session;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionGetDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.WhiteboardStateDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.*;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 import ch.uzh.ifi.hase.soprafs26.service.SessionService;
 
@@ -52,8 +52,22 @@ public class SessionController{
 
     @PutMapping("/courses/{courseId}/sessions/{sessionId}/end")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void endSession(@PathVariable Long courseId, @PathVariable Long sessionId, @RequestHeader("Authorization") String token) {
+    public void endSession(
+            @PathVariable Long courseId,
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token) {
         sessionService.endSession(sessionId, token);
+    }
+
+    @PostMapping("/courses/{courseId}/sessions/{sessionId}/join")
+    @ResponseStatus(HttpStatus.CREATED)
+    @ResponseBody
+    public PersonalWhiteboardGetDTO joinSession(
+            @PathVariable Long courseId,
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token){
+        PersonalWhiteboard whiteboard = sessionService.joinSession(courseId, sessionId, token);
+        return DTOMapper.INSTANCE.convertPersonalWhiteboardToGetDTO(whiteboard);
     }
 
     @GetMapping("/courses/{courseId}/sessions/{sessionId}/whiteboard")
@@ -72,4 +86,48 @@ public class SessionController{
             @RequestBody WhiteboardStateDTO dto) {
         sessionService.saveWhiteboardState(sessionId, token, dto.getCanvasSnapshot());
     }
+
+    //Student saves his snapshot
+    @PutMapping("/courses/{courseId}/sessions/{sessionId}/personal-whiteboard")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void savePersonalWhiteboardState(@PathVariable Long courseId,
+                                            @PathVariable Long sessionId,
+                                            @RequestHeader("Authorization") String token,
+                                            @RequestBody WhiteboardStateDTO dto) {
+        sessionService.savePersonalWhiteboardState(courseId, sessionId, token, dto.getCanvasSnapshot());
+    }
+
+    //Teacher fetches student snapshot
+    @GetMapping("/courses/{courseId}/sessions/{sessionId}/students/{studentId}/whiteboard")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public WhiteboardStateDTO getStudentWhiteboardState(@PathVariable Long courseId,
+                                                        @PathVariable Long sessionId,
+                                                        @PathVariable Long studentId) {
+        return sessionService.getStudentWhiteboardState(sessionId, studentId);
+    }
+
+
+    //Teacher selects student whiteboard
+    @PutMapping("/courses/{courseId}/sessions/{sessionId}/selected-board")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void selectStudentBoard(
+            @PathVariable Long courseId,
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token,
+            @RequestBody SessionBoardSelectDTO dto) {
+        sessionService.selectStudentBoard(courseId, sessionId, token, dto.getStudentId());
+    }
+
+    //Teacher deselects student whiteboard
+    @PutMapping("/courses/{courseId}/sessions/{sessionId}/deselect-board")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deselectStudentBoard(
+            @PathVariable Long courseId,
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token,
+            @RequestBody SessionBoardDeselectDTO dto){
+        sessionService.deselectStudentBoard(courseId, sessionId, token, dto.getStudentId(), dto.getCanvasSnapshot());
+    }
+
 }

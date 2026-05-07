@@ -1,23 +1,13 @@
 package ch.uzh.ifi.hase.soprafs26.rest.mapper;
 
+import ch.uzh.ifi.hase.soprafs26.entity.*;
 import org.mapstruct.*;
 import org.mapstruct.factory.Mappers;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
-import ch.uzh.ifi.hase.soprafs26.entity.Course;
-import ch.uzh.ifi.hase.soprafs26.entity.User;
-import ch.uzh.ifi.hase.soprafs26.entity.Session;
-import ch.uzh.ifi.hase.soprafs26.entity.ChatMessage;
 import ch.uzh.ifi.hase.soprafs26.constant.*;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.UserAuthDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPostDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.CourseGetDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePostDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionGetDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.ChatMessageGetDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.ChatMessagePostDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.*;
 
 /**
  * DTOMapper
@@ -81,10 +71,7 @@ public interface DTOMapper {
 	@Mapping(source = "teacher.id", target = "teacherId")
 	CourseGetDTO convertEntitiytoCourseGetDTO(Course course);
 
-
-
 	//Session mappings
-
 	@Mapping(source = "title", target = "title")
 	@Mapping(target = "mode", ignore = true)
 	@Mapping(target = "course", ignore = true)
@@ -102,7 +89,6 @@ public interface DTOMapper {
 	SessionGetDTO convertSessionEntityToSessionGetDTO(Session session);
 	
 	//ChatMessage mappings
-
 	@Mapping(source = "messageId", target = "messageId")
 	@Mapping(source = "session.sessionId", target = "sessionId")
 	@Mapping(source = "user.id", target = "userId")
@@ -110,6 +96,10 @@ public interface DTOMapper {
 	@Mapping(source = "content", target = "content")
 	@Mapping(source = "timestamp", target = "timestamp")
 	ChatMessageGetDTO convertChatMessageEntityToGetDTO(ChatMessage chatMessage);
-	
+
+    //Personal whiteboard mappings
+    @Mapping(source = "whiteboardId", target = "whiteboardId")
+    @Mapping(source = "currentPage.canvasSnapshot", target = "canvasSnapshot")
+    PersonalWhiteboardGetDTO convertPersonalWhiteboardToGetDTO(PersonalWhiteboard whiteboard);
 }
 
