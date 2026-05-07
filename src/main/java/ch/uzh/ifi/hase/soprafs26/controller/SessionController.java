@@ -1,12 +1,16 @@
 package ch.uzh.ifi.hase.soprafs26.controller;
 
 import ch.uzh.ifi.hase.soprafs26.entity.PersonalWhiteboard;
+import ch.uzh.ifi.hase.soprafs26.entity.SessionFile;
 import jakarta.persistence.PreUpdate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import ch.uzh.ifi.hase.soprafs26.entity.Session;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.*;
@@ -128,6 +132,38 @@ public class SessionController{
             @RequestHeader("Authorization") String token,
             @RequestBody SessionBoardDeselectDTO dto){
         sessionService.deselectStudentBoard(courseId, sessionId, token, dto.getStudentId(), dto.getCanvasSnapshot());
+    }
+
+    @GetMapping("/sessions/{sessionId}/files")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public List<SessionFileGetDTO> getSessionFiles(
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token) {
+        List<SessionFile> files = sessionService.getSessionFiles(sessionId, token);
+        return files.stream().map(f -> toSessionFileGetDTO(f)).collect(Collectors.toList());
+    }
+
+    @PostMapping("/sessions/{sessionId}/files")
+    @ResponseStatus(HttpStatus.CREATED)
+    @ResponseBody
+    public SessionFileGetDTO uploadSessionFile(
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token,
+            @RequestParam("file") MultipartFile file) {
+        SessionFile saved = sessionService.uploadSessionFile(sessionId, token, file);
+        return toSessionFileGetDTO(saved);
+    }
+
+    private SessionFileGetDTO toSessionFileGetDTO(SessionFile f) {
+        SessionFileGetDTO dto = new SessionFileGetDTO();
+        dto.setId(f.getId());
+        dto.setFileName(f.getFileName());
+        dto.setFileType(f.getFileType());
+        dto.setData(Base64.getEncoder().encodeToString(f.getData()));
+        dto.setUploadedAt(f.getUploadedAt());
+        dto.setSessionId(f.getSession().getSessionId());
+        return dto;
     }
 
 }
