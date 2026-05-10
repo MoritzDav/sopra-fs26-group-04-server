@@ -3,6 +3,13 @@ package ch.uzh.ifi.hase.soprafs26.rest;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import ch.uzh.ifi.hase.soprafs26.constant.SessionMode;
+import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
+import ch.uzh.ifi.hase.soprafs26.entity.PersonalWhiteboard;
+import ch.uzh.ifi.hase.soprafs26.entity.Session;
+import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.TextMessage;
@@ -13,6 +20,8 @@ import ch.uzh.ifi.hase.soprafs26.rest.dto.WhiteboardDrawingMessage;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Unit tests for WhiteboardWebSocketHandler.
@@ -21,6 +30,8 @@ import java.net.URI;
 public class WhiteboardWebSocketHandlerTest {
 
     private WhiteboardWebSocketHandler webSocketHandler;
+    private SessionRepository sessionRepository;
+    private UserRepository userRepository;
 
     private WebSocketSession mockSession1;
     private WebSocketSession mockSession2;
@@ -29,10 +40,15 @@ public class WhiteboardWebSocketHandlerTest {
 
     @BeforeEach
     public void setup() {
-        webSocketHandler = new WhiteboardWebSocketHandler();
+        sessionRepository = mock(SessionRepository.class);
+        userRepository = mock(UserRepository.class);
+        webSocketHandler = new WhiteboardWebSocketHandler(sessionRepository, userRepository);
         mockSession1 = createMockSession("1", "http://localhost:8080/ws/whiteboard/1");
         mockSession2 = createMockSession("2", "http://localhost:8080/ws/whiteboard/1");
         mockSession3 = createMockSession("3", "http://localhost:8080/ws/whiteboard/2");
+
+        when(sessionRepository.findByCourseId(anyLong())).thenReturn(List.of());
+        when(userRepository.findById(anyLong())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -73,6 +89,11 @@ public class WhiteboardWebSocketHandlerTest {
         webSocketHandler.afterConnectionEstablished(mockSession1);
         webSocketHandler.afterConnectionEstablished(mockSession2);
 
+        User teacher = new User();
+        teacher.setId(100L);
+        teacher.setRole(UserRole.TEACHER);
+        when(userRepository.findById(100L)).thenReturn(Optional.of(teacher));
+
         WhiteboardDrawingMessage drawingMessage = new WhiteboardDrawingMessage(1L, 100L, "draw");
         drawingMessage.setX(10.5);
         drawingMessage.setY(20.5);
@@ -97,6 +118,11 @@ public class WhiteboardWebSocketHandlerTest {
         webSocketHandler.afterConnectionEstablished(mockSession2);
         webSocketHandler.afterConnectionEstablished(mockSession3);
 
+        User teacher = new User();
+        teacher.setId(100L);
+        teacher.setRole(UserRole.TEACHER);
+        when(userRepository.findById(100L)).thenReturn(Optional.of(teacher));
+
         WhiteboardDrawingMessage drawingMessage = new WhiteboardDrawingMessage(1L, 100L, "draw");
         String messageJson = objectMapper.writeValueAsString(drawingMessage);
         TextMessage textMessage = new TextMessage(messageJson);
@@ -115,6 +141,11 @@ public class WhiteboardWebSocketHandlerTest {
         webSocketHandler.afterConnectionEstablished(mockSession1);
         webSocketHandler.afterConnectionEstablished(mockSession2);
 
+        User teacher = new User();
+        teacher.setId(100L);
+        teacher.setRole(UserRole.TEACHER);
+        when(userRepository.findById(100L)).thenReturn(Optional.of(teacher));
+
         WhiteboardDrawingMessage drawingMessage = new WhiteboardDrawingMessage(1L, 100L, "draw");
         String messageJson = objectMapper.writeValueAsString(drawingMessage);
         TextMessage textMessage = new TextMessage(messageJson);
@@ -132,6 +163,11 @@ public class WhiteboardWebSocketHandlerTest {
         // Given - Create a session that will throw IOException on send
         WebSocketSession exceptionSession = createMockSession("2-ex", "http://localhost:8080/ws/whiteboard/1");
         doThrow(new IOException("Send failed")).when(exceptionSession).sendMessage(any());
+
+        User teacher = new User();
+        teacher.setId(100L);
+        teacher.setRole(UserRole.TEACHER);
+        when(userRepository.findById(100L)).thenReturn(Optional.of(teacher));
         
         webSocketHandler.afterConnectionEstablished(mockSession1);
         webSocketHandler.afterConnectionEstablished(exceptionSession);
@@ -142,6 +178,55 @@ public class WhiteboardWebSocketHandlerTest {
 
         // When/Then - Should not throw exception, just handle it gracefully
         assertDoesNotThrow(() -> webSocketHandler.handleTextMessage(mockSession1, textMessage));
+    }
+
+    @Test
+    public void testHandleTextMessage_StudentStrokeNotBroadcastWhenCollaborationInactive() throws Exception {
+        webSocketHandler.afterConnectionEstablished(mockSession1);
+        webSocketHandler.afterConnectionEstablished(mockSession2);
+
+        User student = new User();
+        student.setId(200L);
+        student.setRole(UserRole.STUDENT);
+        when(userRepository.findById(200L)).thenReturn(Optional.of(student));
+        when(sessionRepository.findByCourseId(1L)).thenReturn(List.of());
+
+        WhiteboardDrawingMessage drawingMessage = new WhiteboardDrawingMessage(1L, 200L, "draw");
+        String messageJson = objectMapper.writeValueAsString(drawingMessage);
+
+        webSocketHandler.handleTextMessage(mockSession1, new TextMessage(messageJson));
+
+        verify(mockSession1, never()).sendMessage(any(TextMessage.class));
+        verify(mockSession2, never()).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    public void testHandleTextMessage_StudentStrokeBroadcastWhenCollaborationActive() throws Exception {
+        webSocketHandler.afterConnectionEstablished(mockSession1);
+        webSocketHandler.afterConnectionEstablished(mockSession2);
+
+        User student = new User();
+        student.setId(200L);
+        student.setRole(UserRole.STUDENT);
+        when(userRepository.findById(200L)).thenReturn(Optional.of(student));
+
+        PersonalWhiteboard selectedWhiteboard = new PersonalWhiteboard();
+        selectedWhiteboard.setOwner(student);
+
+        Session collaborationSession = new Session();
+        collaborationSession.setActive(true);
+        collaborationSession.setMode(SessionMode.STUDENT);
+        collaborationSession.setSelectedWhiteboard(selectedWhiteboard);
+
+        when(sessionRepository.findByCourseId(1L)).thenReturn(List.of(collaborationSession));
+
+        WhiteboardDrawingMessage drawingMessage = new WhiteboardDrawingMessage(1L, 200L, "draw");
+        String messageJson = objectMapper.writeValueAsString(drawingMessage);
+
+        webSocketHandler.handleTextMessage(mockSession1, new TextMessage(messageJson));
+
+        verify(mockSession1, atLeastOnce()).sendMessage(any(TextMessage.class));
+        verify(mockSession2, atLeastOnce()).sendMessage(any(TextMessage.class));
     }
 
     @Test

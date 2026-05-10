@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.service;
 
 import ch.uzh.ifi.hase.soprafs26.entity.*;
 import ch.uzh.ifi.hase.soprafs26.repository.BrowniePointEntryRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.CourseEnrollmentRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.LeaderBoardEntryGetDTO;
 import jakarta.transaction.Transactional;
@@ -31,15 +32,18 @@ public class BrowniePointService {
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
     private final SessionRepository sessionRepository;
+    private final CourseEnrollmentRepository courseEnrollmentRepository;
 
     public BrowniePointService(@Qualifier("browniePointEntryRepository") BrowniePointEntryRepository browniePointEntryRepository,
                                @Qualifier("userRepository") UserRepository userRepository,
                                @Qualifier("courseRepository") CourseRepository courseRepository,
-                               @Qualifier("sessionRepository") SessionRepository sessionRepository) {
+                               @Qualifier("sessionRepository") SessionRepository sessionRepository,
+                               @Qualifier("courseEnrollmentRepository") CourseEnrollmentRepository courseEnrollmentRepository) {
         this.browniePointEntryRepository = browniePointEntryRepository;
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
         this.sessionRepository = sessionRepository;
+        this.courseEnrollmentRepository = courseEnrollmentRepository;
     }
 
 
@@ -80,7 +84,19 @@ public class BrowniePointService {
     }
 
 
-    public List<LeaderBoardEntryGetDTO> getLeaderboard(Long courseId) {
+    public List<LeaderBoardEntryGetDTO> getLeaderboard(Long courseId, String token) {
+        User user = getUserByToken(token);
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        boolean isTeacher = course.getTeacher().getId().equals(user.getId());
+        boolean isStudent = courseEnrollmentRepository.findByStudentIdAndCourseId(user.getId(), courseId).isPresent();
+
+        if (!isTeacher && !isStudent) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not part of this course");
+        }
+
         List<Object[]> results = browniePointEntryRepository.findLeaderboardByCourseId(courseId);
 
         return results.stream().map(row -> {

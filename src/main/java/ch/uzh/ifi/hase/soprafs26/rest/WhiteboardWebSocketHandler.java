@@ -1,5 +1,11 @@
 package ch.uzh.ifi.hase.soprafs26.rest;
 
+import ch.uzh.ifi.hase.soprafs26.constant.SessionMode;
+import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
+import ch.uzh.ifi.hase.soprafs26.entity.Session;
+import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -22,6 +28,9 @@ import java.util.Set;
 public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
     
     private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    private final SessionRepository sessionRepository;
+    private final UserRepository userRepository;
     
     /**
      * Map to store connected sessions per course.
@@ -29,6 +38,11 @@ public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
      */
     private final Map<String, Set<WebSocketSession>> courseConnections = 
         Collections.synchronizedMap(new HashMap<>());
+
+    public WhiteboardWebSocketHandler(SessionRepository sessionRepository, UserRepository userRepository) {
+        this.sessionRepository = sessionRepository;
+        this.userRepository = userRepository;
+    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -74,6 +88,11 @@ public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
                 message.getPayload(), 
                 WhiteboardDrawingMessage.class
             );
+
+            if (isStudentStrokeAction(drawingMessage)
+                && !isActiveCollaborationForStudent(courseId, drawingMessage.getUserId())) {
+                return;
+            }
             
             // Broadcast to all connected clients in the same course
             broadcastMessage(courseId, message.getPayload());
@@ -116,6 +135,36 @@ public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
             return parts[parts.length - 1];
         }
         return "unknown";
+    }
+
+    private boolean isStudentStrokeAction(WhiteboardDrawingMessage drawingMessage) {
+        if (drawingMessage == null || drawingMessage.getUserId() == null) {
+            return false;
+        }
+
+        String action = drawingMessage.getAction();
+        boolean isStrokeAction = "draw".equalsIgnoreCase(action) || "stroke".equalsIgnoreCase(action);
+        if (!isStrokeAction) {
+            return false;
+        }
+
+        User user = userRepository.findById(drawingMessage.getUserId()).orElse(null);
+        return user != null && user.getRole() == UserRole.STUDENT;
+    }
+
+    private boolean isActiveCollaborationForStudent(String courseId, Long userId) {
+        try {
+            Long parsedCourseId = Long.parseLong(courseId);
+            return sessionRepository.findByCourseId(parsedCourseId).stream()
+                    .filter(Session::isActive)
+                    .anyMatch(session -> session.getMode() == SessionMode.MULTI_MODE
+                            || (session.getMode() == SessionMode.STUDENT
+                            && session.getSelectedWhiteboard() != null
+                            && session.getSelectedWhiteboard().getOwner() != null
+                            && userId.equals(session.getSelectedWhiteboard().getOwner().getId())));
+        } catch (NumberFormatException ex) {
+            return false;
+        }
     }
 
     //Get the number of connected sessions for a specific course.

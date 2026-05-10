@@ -1,7 +1,9 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
+import ch.uzh.ifi.hase.soprafs26.constant.SessionMode;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.*;
+import ch.uzh.ifi.hase.soprafs26.rest.SessionWebSocketHandler;
 import ch.uzh.ifi.hase.soprafs26.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,10 @@ public class SessionServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private ChatMessageService chatMessageService;
     @Mock private CourseEnrollmentRepository courseEnrollmentRepository;
+    @Mock private WhiteboardPageRepository whiteboardPageRepository;
+    @Mock private PersonalWhiteboardRepository personalWhiteboardRepository;
+    @Mock private SessionFileRepository sessionFileRepository;
+    @Mock private SessionWebSocketHandler sessionWebSocketHandler;
 
     @InjectMocks
     private SessionService sessionService;
@@ -247,6 +253,71 @@ public class SessionServiceTest {
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 sessionService.getSessionsByCourse(10L, "student-token"));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+    }
+
+    /**
+     * toggleCollaboration
+     */
+
+    @Test
+    void toggleCollaboration_enableByTeacher_success() {
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        sessionService.toggleCollaboration(1L, "teacher-token", true);
+
+        assertEquals(SessionMode.MULTI_MODE, session.getMode());
+        verify(sessionRepository).save(session);
+        verify(sessionWebSocketHandler).broadcastCollaborationStart("1", null, null);
+    }
+
+    @Test
+    void toggleCollaboration_disableByTeacher_success() {
+        session.setMode(SessionMode.MULTI_MODE);
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        sessionService.toggleCollaboration(1L, "teacher-token", false);
+
+        assertEquals(SessionMode.NORMAL, session.getMode());
+        verify(sessionRepository).save(session);
+        verify(sessionWebSocketHandler).broadcastCollaborationEnd("1");
+    }
+
+    @Test
+    void toggleCollaboration_invalidToken_throwsUnauthorized() {
+        when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                sessionService.toggleCollaboration(1L, "invalid-token", true));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+    }
+
+    @Test
+    void toggleCollaboration_notTeacher_throwsForbidden() {
+        when(userRepository.findByToken("student-token")).thenReturn(Optional.of(student));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                sessionService.toggleCollaboration(1L, "student-token", true));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+    }
+
+    @Test
+    void toggleCollaboration_notSessionOwner_throwsForbidden() {
+        User otherTeacher = new User();
+        otherTeacher.setId(3L);
+        otherTeacher.setToken("other-token");
+        otherTeacher.setRole(UserRole.TEACHER);
+
+        when(userRepository.findByToken("other-token")).thenReturn(Optional.of(otherTeacher));
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                sessionService.toggleCollaboration(1L, "other-token", true));
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
     }

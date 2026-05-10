@@ -134,6 +134,15 @@ public class SessionController{
         sessionService.deselectStudentBoard(courseId, sessionId, token, dto.getStudentId(), dto.getCanvasSnapshot());
     }
 
+    @PutMapping("/sessions/{sessionId}/collaboration")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void toggleCollaboration(
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token,
+            @RequestBody SessionCollaborationDTO dto) {
+        sessionService.toggleCollaboration(sessionId, token, dto.isCollaborationActive());
+    }
+
     @GetMapping("/sessions/{sessionId}/files")
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
