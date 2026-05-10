@@ -1,12 +1,20 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import ch.uzh.ifi.hase.soprafs26.rest.SessionWebSocketHandler;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionBoardSelectDTO;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -37,6 +45,7 @@ public class SessionService {
     private final SessionWebSocketHandler sessionWebSocketHandler;
     private final PersonalWhiteboardRepository personalWhiteboardRepository;
     private final SessionFileRepository sessionFileRepository;
+    private final GeminiSummaryService geminiSummaryService;
 
 
     public SessionService(@Qualifier("sessionRepository") SessionRepository sessionRepository,
@@ -47,7 +56,8 @@ public class SessionService {
                           @Qualifier("courseEnrollmentRepository") CourseEnrollmentRepository courseEnrollmentRepository,
                           @Qualifier("personalWhiteboardRepository") PersonalWhiteboardRepository personalWhiteboardRepository,
                           @Qualifier("sessionFileRepository") SessionFileRepository sessionFileRepository,
-                          SessionWebSocketHandler sessionWebSocketHandler) {
+                          SessionWebSocketHandler sessionWebSocketHandler,
+                          GeminiSummaryService geminiSummaryService) {
         this.sessionRepository = sessionRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
@@ -57,6 +67,7 @@ public class SessionService {
         this.personalWhiteboardRepository = personalWhiteboardRepository;
         this.sessionFileRepository = sessionFileRepository;
         this.sessionWebSocketHandler = sessionWebSocketHandler;
+        this.geminiSummaryService = geminiSummaryService;
     }
 
     //Create and start session
@@ -378,6 +389,111 @@ public class SessionService {
 
         log.debug("Uploaded file {} to session {}", file.getOriginalFilename(), sessionId);
         return sessionFile;
+    }
+
+    public byte[] summarizeSessionFileToPdf(Long sessionId, Long fileId, String token) {
+        getUserByToken(token);
+        getSessionById(sessionId);
+
+        SessionFile sessionFile = sessionFileRepository.findByIdAndSessionSessionId(fileId, sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found in session"));
+
+        if (!"application/pdf".equals(sessionFile.getFileType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF files can be summarized");
+        }
+
+        String extractedText = extractTextFromPdf(sessionFile.getData());
+        if (extractedText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No extractable text found in PDF");
+        }
+
+        String summaryText = geminiSummaryService.summarizeText(extractedText);
+        return createSummaryPdf(summaryText);
+    }
+
+    private String extractTextFromPdf(byte[] pdfData) {
+        try (PDDocument document = PDDocument.load(pdfData)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            return stripper.getText(document).trim();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Failed to parse PDF content");
+        }
+    }
+
+    private byte[] createSummaryPdf(String summaryText) {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+
+            float margin = 50f;
+            float yPosition = page.getMediaBox().getHeight() - margin;
+            float leading = 16f;
+            float maxWidth = page.getMediaBox().getWidth() - (2 * margin);
+
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+            contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
+            contentStream.beginText();
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText("PDF Summary");
+            contentStream.endText();
+
+            yPosition -= 28f;
+            contentStream.setFont(PDType1Font.HELVETICA, 11);
+
+            for (String line : wrapText(summaryText, PDType1Font.HELVETICA, 11, maxWidth)) {
+                if (yPosition <= margin) {
+                    contentStream.close();
+                    page = new PDPage(PDRectangle.A4);
+                    document.addPage(page);
+                    contentStream = new PDPageContentStream(document, page);
+                    contentStream.setFont(PDType1Font.HELVETICA, 11);
+                    yPosition = page.getMediaBox().getHeight() - margin;
+                }
+
+                contentStream.beginText();
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText(line);
+                contentStream.endText();
+                yPosition -= leading;
+            }
+
+            contentStream.close();
+            document.save(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to generate summary PDF");
+        }
+    }
+
+    private List<String> wrapText(String text, PDType1Font font, float fontSize, float maxWidth) throws IOException {
+        List<String> wrappedLines = new ArrayList<>();
+        for (String paragraph : text.split("\\r?\\n")) {
+            if (paragraph.isBlank()) {
+                wrappedLines.add("");
+                continue;
+            }
+
+            String[] words = paragraph.split("\\s+");
+            StringBuilder currentLine = new StringBuilder();
+            for (String word : words) {
+                String candidate = currentLine.isEmpty() ? word : currentLine + " " + word;
+                float width = font.getStringWidth(candidate) / 1000 * fontSize;
+                if (width <= maxWidth) {
+                    currentLine = new StringBuilder(candidate);
+                } else {
+                    if (!currentLine.isEmpty()) {
+                        wrappedLines.add(currentLine.toString());
+                    }
+                    currentLine = new StringBuilder(word);
+                }
+            }
+
+            if (!currentLine.isEmpty()) {
+                wrappedLines.add(currentLine.toString());
+            }
+        }
+        return wrappedLines;
     }
 
     //Helper functions

@@ -3,7 +3,11 @@ package ch.uzh.ifi.hase.soprafs26.controller;
 import ch.uzh.ifi.hase.soprafs26.entity.PersonalWhiteboard;
 import ch.uzh.ifi.hase.soprafs26.entity.SessionFile;
 import jakarta.persistence.PreUpdate;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -162,6 +166,20 @@ public class SessionController{
             @RequestParam("file") MultipartFile file) {
         SessionFile saved = sessionService.uploadSessionFile(sessionId, token, file);
         return toSessionFileGetDTO(saved);
+    }
+
+    @PostMapping("/sessions/{sessionId}/files/{fileId}/summarize")
+    public ResponseEntity<byte[]> summarizeSessionFile(
+            @PathVariable Long sessionId,
+            @PathVariable Long fileId,
+            @RequestHeader("Authorization") String token) {
+        byte[] summaryPdf = sessionService.summarizeSessionFileToPdf(sessionId, fileId, token);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment().filename("summary-" + fileId + ".pdf").build());
+
+        return new ResponseEntity<>(summaryPdf, headers, HttpStatus.OK);
     }
 
     private SessionFileGetDTO toSessionFileGetDTO(SessionFile f) {
