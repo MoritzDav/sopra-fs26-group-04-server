@@ -287,7 +287,7 @@ public class SessionService {
         sessionRepository.save(session);
         sessionRepository.flush();
 
-        sessionWebSocketHandler.broadcastStudentBoardSelected(sessionId.toString(), studentId, null);
+        sessionWebSocketHandler.broadcastCollaborationStart(sessionId.toString(), studentId, whiteboard.getWhiteboardId());
         log.debug("Teacher selected student {} board in session {}", studentId, sessionId);
     }
 
@@ -314,8 +314,33 @@ public class SessionService {
         sessionRepository.save(session);
         sessionRepository.flush();
 
-        sessionWebSocketHandler.broadcastStudentBoardDeselected(sessionId.toString());
+        sessionWebSocketHandler.broadcastCollaborationEnd(sessionId.toString());
         log.debug("Teacher deselected student board in session {}", sessionId);
+    }
+
+    public void toggleCollaboration(Long sessionId, String token, boolean collaborationActive) {
+        User user = getUserByToken(token);
+        validateTeacher(user);
+
+        Session session = getSessionById(sessionId);
+        validateSessionOwner(session, user);
+
+        if (collaborationActive) {
+            session.setMode(SessionMode.MULTI_MODE);
+            session.setSelectedWhiteboard(null);
+            sessionRepository.save(session);
+            sessionRepository.flush();
+            sessionWebSocketHandler.broadcastCollaborationStart(sessionId.toString(), null, null);
+            log.debug("Enabled collaboration mode in session {}", sessionId);
+            return;
+        }
+
+        session.setMode(SessionMode.NORMAL);
+        session.setSelectedWhiteboard(null);
+        sessionRepository.save(session);
+        sessionRepository.flush();
+        sessionWebSocketHandler.broadcastCollaborationEnd(sessionId.toString());
+        log.debug("Disabled collaboration mode in session {}", sessionId);
     }
 
 

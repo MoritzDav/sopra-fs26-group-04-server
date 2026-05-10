@@ -26,8 +26,9 @@ public class BrowniePointController {
     @GetMapping("/courses/{courseId}/leaderboard")
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
-    public List<LeaderBoardEntryGetDTO> getLeaderboard(@PathVariable Long courseId) {
-        return browniePointService.getLeaderboard(courseId);
+    public List<LeaderBoardEntryGetDTO> getLeaderboard(@PathVariable Long courseId,
+                                                       @RequestHeader("Authorization") String token) {
+        return browniePointService.getLeaderboard(courseId, token);
     }
 
     //As a teacher distribute brownie points

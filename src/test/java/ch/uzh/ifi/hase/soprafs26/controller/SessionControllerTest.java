@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import ch.uzh.ifi.hase.soprafs26.constant.SessionMode;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.Session;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionCollaborationDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionPostDTO;
 import ch.uzh.ifi.hase.soprafs26.service.*;
 
@@ -210,6 +211,57 @@ public class SessionControllerTest {
         // then
         mockMvc.perform(request)
                 .andExpect(status().isNotFound());
+    }
+
+
+    @Test
+    void toggleCollaboration_enable_returns204() throws Exception {
+        SessionCollaborationDTO dto = new SessionCollaborationDTO();
+        dto.setCollaborationActive(true);
+
+        doNothing().when(sessionService).toggleCollaboration(1L, "teacher-token", true);
+
+        MockHttpServletRequestBuilder request = put("/sessions/1/collaboration")
+                .header("Authorization", "teacher-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(dto));
+
+        mockMvc.perform(request)
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void toggleCollaboration_invalidToken_returns401() throws Exception {
+        SessionCollaborationDTO dto = new SessionCollaborationDTO();
+        dto.setCollaborationActive(true);
+
+        doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"))
+                .when(sessionService).toggleCollaboration(1L, "invalid-token", true);
+
+        MockHttpServletRequestBuilder request = put("/sessions/1/collaboration")
+                .header("Authorization", "invalid-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(dto));
+
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void toggleCollaboration_notTeacher_returns403() throws Exception {
+        SessionCollaborationDTO dto = new SessionCollaborationDTO();
+        dto.setCollaborationActive(false);
+
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Only teachers can do this"))
+                .when(sessionService).toggleCollaboration(1L, "student-token", false);
+
+        MockHttpServletRequestBuilder request = put("/sessions/1/collaboration")
+                .header("Authorization", "student-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(dto));
+
+        mockMvc.perform(request)
+                .andExpect(status().isForbidden());
     }
 
 
