@@ -1,5 +1,6 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import ch.uzh.ifi.hase.soprafs26.repository.*;
@@ -34,6 +36,7 @@ public class SessionService {
     private final CourseEnrollmentRepository courseEnrollmentRepository;
     private final SessionWebSocketHandler sessionWebSocketHandler;
     private final PersonalWhiteboardRepository personalWhiteboardRepository;
+    private final SessionFileRepository sessionFileRepository;
 
 
     public SessionService(@Qualifier("sessionRepository") SessionRepository sessionRepository,
@@ -43,6 +46,7 @@ public class SessionService {
                           @Qualifier("chatMessageService") ChatMessageService chatMessageService,
                           @Qualifier("courseEnrollmentRepository") CourseEnrollmentRepository courseEnrollmentRepository,
                           @Qualifier("personalWhiteboardRepository") PersonalWhiteboardRepository personalWhiteboardRepository,
+                          @Qualifier("sessionFileRepository") SessionFileRepository sessionFileRepository,
                           SessionWebSocketHandler sessionWebSocketHandler) {
         this.sessionRepository = sessionRepository;
         this.courseRepository = courseRepository;
@@ -51,6 +55,7 @@ public class SessionService {
         this.chatMessageService = chatMessageService;
         this.courseEnrollmentRepository = courseEnrollmentRepository;
         this.personalWhiteboardRepository = personalWhiteboardRepository;
+        this.sessionFileRepository = sessionFileRepository;
         this.sessionWebSocketHandler = sessionWebSocketHandler;
     }
 
@@ -313,6 +318,42 @@ public class SessionService {
         log.debug("Teacher deselected student board in session {}", sessionId);
     }
 
+
+    public List<SessionFile> getSessionFiles(Long sessionId, String token) {
+        getUserByToken(token);
+        getSessionById(sessionId);
+        return sessionFileRepository.findBySessionSessionId(sessionId);
+    }
+
+    public SessionFile uploadSessionFile(Long sessionId, String token, MultipartFile file) {
+        getUserByToken(token);
+        Session session = getSessionById(sessionId);
+
+        String contentType = file.getContentType();
+        if (!"application/pdf".equals(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF files are allowed");
+        }
+
+        byte[] data;
+        try {
+            data = file.getBytes();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read file");
+        }
+
+        SessionFile sessionFile = new SessionFile();
+        sessionFile.setFileName(file.getOriginalFilename());
+        sessionFile.setFileType(contentType);
+        sessionFile.setData(data);
+        sessionFile.setUploadedAt(LocalDateTime.now());
+        sessionFile.setSession(session);
+
+        sessionFile = sessionFileRepository.save(sessionFile);
+        sessionFileRepository.flush();
+
+        log.debug("Uploaded file {} to session {}", file.getOriginalFilename(), sessionId);
+        return sessionFile;
+    }
 
     //Helper functions
     // Fetch user via token including validation
