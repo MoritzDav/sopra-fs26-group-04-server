@@ -7,12 +7,17 @@ import ch.uzh.ifi.hase.soprafs26.rest.SessionWebSocketHandler;
 import ch.uzh.ifi.hase.soprafs26.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +36,7 @@ public class SessionServiceTest {
     @Mock private PersonalWhiteboardRepository personalWhiteboardRepository;
     @Mock private SessionFileRepository sessionFileRepository;
     @Mock private SessionWebSocketHandler sessionWebSocketHandler;
+    @Mock private GeminiSummaryService geminiSummaryService;
 
     @InjectMocks
     private SessionService sessionService;
@@ -320,5 +326,55 @@ public class SessionServiceTest {
                 sessionService.toggleCollaboration(1L, "other-token", true));
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+    }
+
+    @Test
+    void summarizeSessionFileToPdf_success_returnsPdf() throws Exception {
+        SessionFile file = new SessionFile();
+        file.setId(5L);
+        file.setFileType("application/pdf");
+        file.setData(createTestPdfBytes("This is a test PDF content."));
+        file.setSession(session);
+
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionFileRepository.findByIdAndSessionSessionId(5L, 1L)).thenReturn(Optional.of(file));
+        when(geminiSummaryService.summarizeText(any())).thenReturn("Short summary");
+
+        byte[] result = sessionService.summarizeSessionFileToPdf(1L, 5L, "teacher-token");
+
+        assertNotNull(result);
+        assertTrue(result.length > 0);
+        verify(geminiSummaryService).summarizeText(any());
+    }
+
+    @Test
+    void summarizeSessionFileToPdf_fileNotFound_throwsNotFound() {
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionFileRepository.findByIdAndSessionSessionId(5L, 1L)).thenReturn(Optional.empty());
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                sessionService.summarizeSessionFileToPdf(1L, 5L, "teacher-token"));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+    }
+
+    private byte[] createTestPdfBytes(String text) throws Exception {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+            contentStream.beginText();
+            contentStream.setFont(PDType1Font.HELVETICA, 12);
+            contentStream.newLineAtOffset(100, 700);
+            contentStream.showText(text);
+            contentStream.endText();
+            contentStream.close();
+
+            document.save(outputStream);
+            return outputStream.toByteArray();
+        }
     }
 }

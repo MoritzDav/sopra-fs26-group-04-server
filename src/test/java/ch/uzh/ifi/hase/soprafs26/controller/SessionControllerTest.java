@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +32,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(SessionController.class)
 public class SessionControllerTest {
@@ -262,6 +265,33 @@ public class SessionControllerTest {
 
         mockMvc.perform(request)
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void summarizeSessionFile_success_returnsPdfAttachment() throws Exception {
+        byte[] pdfBytes = "fake-pdf".getBytes(StandardCharsets.UTF_8);
+        given(sessionService.summarizeSessionFileToPdf(1L, 2L, "teacher-token")).willReturn(pdfBytes);
+
+        MockHttpServletRequestBuilder request = post("/sessions/1/files/2/summarize")
+                .header("Authorization", "teacher-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"summary-2.pdf\""))
+                .andExpect(content().bytes(pdfBytes));
+    }
+
+    @Test
+    void summarizeSessionFile_invalidToken_returns401() throws Exception {
+        given(sessionService.summarizeSessionFileToPdf(1L, 2L, "invalid-token"))
+                .willThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+
+        MockHttpServletRequestBuilder request = post("/sessions/1/files/2/summarize")
+                .header("Authorization", "invalid-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
     }
 
 
