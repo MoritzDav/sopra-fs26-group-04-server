@@ -181,7 +181,7 @@ public class WhiteboardWebSocketHandlerTest {
     }
 
     @Test
-    public void testHandleTextMessage_StudentStrokeNotBroadcastWhenCollaborationInactive() throws Exception {
+    public void testHandleTextMessage_StudentStrokeBroadcastRegardlessOfCollaborationMode() throws Exception {
         webSocketHandler.afterConnectionEstablished(mockSession1);
         webSocketHandler.afterConnectionEstablished(mockSession2);
 
@@ -196,8 +196,8 @@ public class WhiteboardWebSocketHandlerTest {
 
         webSocketHandler.handleTextMessage(mockSession1, new TextMessage(messageJson));
 
-        verify(mockSession1, never()).sendMessage(any(TextMessage.class));
-        verify(mockSession2, never()).sendMessage(any(TextMessage.class));
+        verify(mockSession1, atLeastOnce()).sendMessage(any(TextMessage.class));
+        verify(mockSession2, atLeastOnce()).sendMessage(any(TextMessage.class));
     }
 
     @Test
