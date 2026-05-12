@@ -83,25 +83,7 @@ public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
         String uri = session.getUri().toString();
         String courseId = extractCourseId(uri);
-        
-        try {
-            // Parse drawing message
-            WhiteboardDrawingMessage drawingMessage = objectMapper.readValue(
-                message.getPayload(), 
-                WhiteboardDrawingMessage.class
-            );
-
-            if (isStudentStrokeAction(drawingMessage)
-                && !isActiveCollaborationForStudent(courseId, drawingMessage.getUserId())) {
-                return;
-            }
-            
-            // Broadcast to all connected clients in the same course
-            broadcastMessage(courseId, message.getPayload());
-            
-        } catch (Exception e) {
-            System.err.println("Error processing drawing message: " + e.getMessage());
-        }
+        broadcastMessage(courseId, message.getPayload());
     }
 
     /**
