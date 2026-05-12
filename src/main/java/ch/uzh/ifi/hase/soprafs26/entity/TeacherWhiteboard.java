@@ -9,7 +9,7 @@ public class TeacherWhiteboard extends Whiteboard {
     @Column(nullable = false)
     private boolean isShared;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_page_id")
     private WhiteboardPage currentPage;
 

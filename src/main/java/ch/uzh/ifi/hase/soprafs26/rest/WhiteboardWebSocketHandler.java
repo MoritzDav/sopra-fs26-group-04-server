@@ -11,6 +11,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.WhiteboardDrawingMessage;
 
@@ -27,7 +28,8 @@ import java.util.Set;
 @Component
 public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
     
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
