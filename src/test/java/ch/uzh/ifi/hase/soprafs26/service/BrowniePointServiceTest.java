@@ -18,6 +18,8 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import ch.uzh.ifi.hase.soprafs26.rest.dto.LeaderBoardEntryGetDTO;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -135,5 +138,124 @@ public class BrowniePointServiceTest {
                 browniePointService.getLeaderboard(10L, "teacher-token"));
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+    }
+
+    @Test
+    void getLeaderboard_returnsDtoFieldsCorrectly() {
+        User leaderboardStudent = new User();
+        leaderboardStudent.setId(2L);
+        leaderboardStudent.setUsername("student1");
+        leaderboardStudent.setFirstName("Anna");
+        leaderboardStudent.setLastName("Müller");
+
+        List<Object[]> leaderboardRows = new ArrayList<>();
+        leaderboardRows.add(new Object[]{leaderboardStudent, 42L});
+
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        when(courseEnrollmentRepository.findByStudentIdAndCourseId(1L, 10L)).thenReturn(Optional.empty());
+        when(browniePointEntryRepository.findLeaderboardByCourseId(10L)).thenReturn(leaderboardRows);
+
+        LeaderBoardEntryGetDTO dto = browniePointService.getLeaderboard(10L, "teacher-token").get(0);
+
+        assertEquals(2L, dto.getUserId());
+        assertEquals("student1", dto.getUsername());
+        assertEquals("Anna", dto.getFirstName());
+        assertEquals("Müller", dto.getLastName());
+        assertEquals(42L, dto.getTotalPoints());
+    }
+
+    // ── awardBrowniePoints ───────────────────────────────────────────────────
+
+    @Test
+    void awardBrowniePoints_success_entryIsSaved() {
+        Session session = new Session();
+        session.setSessionId(20L);
+
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(student));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+
+        browniePointService.awardBrowniePoints(10L, 2L, 20L, 5, "teacher-token");
+
+        verify(browniePointEntryRepository).save(any());
+    }
+
+    @Test
+    void awardBrowniePoints_invalidToken_throwsUnauthorized() {
+        when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                browniePointService.awardBrowniePoints(10L, 2L, 20L, 5, "invalid-token"));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        verify(browniePointEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void awardBrowniePoints_callerIsNotTeacher_throwsForbidden() {
+        when(userRepository.findByToken("student-token")).thenReturn(Optional.of(student));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                browniePointService.awardBrowniePoints(10L, 2L, 20L, 5, "student-token"));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verify(browniePointEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void awardBrowniePoints_studentNotFound_throwsNotFound() {
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                browniePointService.awardBrowniePoints(10L, 99L, 20L, 5, "teacher-token"));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(browniePointEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void awardBrowniePoints_targetIsTeacher_throwsBadRequest() {
+        User anotherTeacher = new User();
+        anotherTeacher.setId(5L);
+        anotherTeacher.setRole(UserRole.TEACHER);
+
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(5L)).thenReturn(Optional.of(anotherTeacher));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                browniePointService.awardBrowniePoints(10L, 5L, 20L, 5, "teacher-token"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        verify(browniePointEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void awardBrowniePoints_courseNotFound_throwsNotFound() {
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(student));
+        when(courseRepository.findById(10L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                browniePointService.awardBrowniePoints(10L, 2L, 20L, 5, "teacher-token"));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(browniePointEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void awardBrowniePoints_sessionNotFound_throwsNotFound() {
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(student));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+        when(sessionRepository.findById(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                browniePointService.awardBrowniePoints(10L, 2L, 99L, 5, "teacher-token"));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(browniePointEntryRepository, never()).save(any());
     }
 }
