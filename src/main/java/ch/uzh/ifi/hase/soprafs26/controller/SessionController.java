@@ -67,6 +67,14 @@ public class SessionController{
         sessionService.endSession(sessionId, token);
     }
 
+    @PostMapping("/sessions/{sessionId}/end")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void endSessionBySessionId(
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token) {
+        sessionService.endSession(sessionId, token);
+    }
+
     @PostMapping("/courses/{courseId}/sessions/{sessionId}/join")
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody

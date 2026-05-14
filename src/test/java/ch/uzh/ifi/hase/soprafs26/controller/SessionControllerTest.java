@@ -217,6 +217,33 @@ public class SessionControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    /**
+     * POST /sessions/{sessionId}/end
+     */
+
+    @Test
+    void endSessionBySessionId_validRequest_returns204() throws Exception {
+        doNothing().when(sessionService).endSession(1L, "teacher-token");
+
+        MockHttpServletRequestBuilder request = post("/sessions/1/end")
+                .header("Authorization", "teacher-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void endSessionBySessionId_invalidToken_returns401() throws Exception {
+        doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"))
+                .when(sessionService).endSession(1L, "invalid-token");
+
+        MockHttpServletRequestBuilder request = post("/sessions/1/end")
+                .header("Authorization", "invalid-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
 
     @Test
     void toggleCollaboration_enable_returns204() throws Exception {
