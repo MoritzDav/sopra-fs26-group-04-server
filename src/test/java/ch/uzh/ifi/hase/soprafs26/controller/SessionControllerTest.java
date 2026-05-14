@@ -28,6 +28,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -292,6 +293,33 @@ public class SessionControllerTest {
 
         mockMvc.perform(request)
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getCourseWhiteboardPdf_success_returnsPdf() throws Exception {
+        byte[] pdfBytes = "pdf-bytes".getBytes(StandardCharsets.UTF_8);
+        given(sessionService.getCourseWhiteboardPdf(1L, "student-token")).willReturn(pdfBytes);
+
+        MockHttpServletRequestBuilder request = get("/courses/1/whiteboard-pdf")
+                .header("Authorization", "student-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition", "inline; filename=\"course-1-whiteboard.pdf\""))
+                .andExpect(content().bytes(pdfBytes));
+    }
+
+    @Test
+    void getCourseWhiteboardPdf_notEnrolled_returns403() throws Exception {
+        given(sessionService.getCourseWhiteboardPdf(1L, "outsider-token"))
+                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not part of this course"));
+
+        MockHttpServletRequestBuilder request = get("/courses/1/whiteboard-pdf")
+                .header("Authorization", "outsider-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isForbidden());
     }
 
 

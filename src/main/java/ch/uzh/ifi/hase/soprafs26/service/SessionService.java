@@ -4,6 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -361,6 +363,37 @@ public class SessionService {
         return sessionFileRepository.findBySessionSessionId(sessionId);
     }
 
+    public byte[] getCourseWhiteboardPdf(Long courseId, String token) {
+        User user = getUserByToken(token);
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        boolean isTeacher = course.getTeacher().getId().equals(user.getId());
+        boolean isStudent = courseEnrollmentRepository.findByStudentIdAndCourseId(user.getId(), courseId).isPresent();
+        if (!isTeacher && !isStudent) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not part of this course");
+        }
+
+        List<Session> sessions = sessionRepository.findByCourseId(courseId);
+        sessions.sort(Comparator.comparing(Session::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+
+        for (Session session : sessions) {
+            if (session.getTeacherWhiteboard() == null || session.getTeacherWhiteboard().getCurrentPage() == null) {
+                continue;
+            }
+
+            String backgroundFile = session.getTeacherWhiteboard().getCurrentPage().getBackgroundFile();
+            if (backgroundFile == null || backgroundFile.isBlank()) {
+                continue;
+            }
+
+            return decodeStoredPdf(backgroundFile);
+        }
+
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No teacher whiteboard PDF found for this course");
+    }
+
     public SessionFile uploadSessionFile(Long sessionId, String token, MultipartFile file) {
         getUserByToken(token);
         Session session = getSessionById(sessionId);
@@ -494,6 +527,30 @@ public class SessionService {
             }
         }
         return wrappedLines;
+    }
+
+    private byte[] decodeStoredPdf(String storedValue) {
+        String data = storedValue.trim();
+
+        if (data.startsWith("data:")) {
+            int commaIndex = data.indexOf(',');
+            if (commaIndex < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored teacher PDF is malformed");
+            }
+
+            String metadata = data.substring(0, commaIndex).toLowerCase();
+            if (!metadata.contains("application/pdf")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored teacher file is not a PDF");
+            }
+
+            data = data.substring(commaIndex + 1);
+        }
+
+        try {
+            return Base64.getDecoder().decode(data);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored teacher PDF cannot be decoded");
+        }
     }
 
     //Helper functions

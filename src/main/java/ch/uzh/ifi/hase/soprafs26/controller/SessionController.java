@@ -157,6 +157,19 @@ public class SessionController{
         return files.stream().map(f -> toSessionFileGetDTO(f)).collect(Collectors.toList());
     }
 
+    @GetMapping("/courses/{courseId}/whiteboard-pdf")
+    public ResponseEntity<byte[]> getCourseWhiteboardPdf(
+            @PathVariable Long courseId,
+            @RequestHeader("Authorization") String token) {
+        byte[] whiteboardPdf = sessionService.getCourseWhiteboardPdf(courseId, token);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.inline().filename("course-" + courseId + "-whiteboard.pdf").build());
+
+        return new ResponseEntity<>(whiteboardPdf, headers, HttpStatus.OK);
+    }
+
     @PostMapping("/sessions/{sessionId}/files")
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
