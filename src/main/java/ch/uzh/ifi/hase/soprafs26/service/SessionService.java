@@ -239,6 +239,58 @@ public class SessionService {
         return dto;
     }
 
+    //Student fetches their own saved canvas state (e.g. after rejoining)
+    public WhiteboardStateDTO getPersonalWhiteboardState(Long sessionId, String token) {
+        User user = getUserByToken(token);
+
+        if (user.getRole() != UserRole.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can fetch their own whiteboard");
+        }
+
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(user.getId(), sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Personal whiteboard not found"));
+
+        WhiteboardStateDTO dto = new WhiteboardStateDTO();
+        if (whiteboard.getCurrentPage() != null) {
+            dto.setCanvasSnapshot(whiteboard.getCurrentPage().getCanvasSnapshot());
+        }
+        return dto;
+    }
+
+    //Student explicitly leaves the session — deletes their whiteboard data
+    public void leaveSession(Long courseId, Long sessionId, String token) {
+        User user = getUserByToken(token);
+
+        if (user.getRole() != UserRole.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can leave a session");
+        }
+
+        Session session = getSessionById(sessionId);
+
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(user.getId(), sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Whiteboard not found"));
+
+        // If teacher is currently inspecting this board, deselect it first
+        if (whiteboard.getWhiteboardId().equals(
+                session.getSelectedWhiteboard() != null ? session.getSelectedWhiteboard().getWhiteboardId() : null)) {
+            session.setSelectedWhiteboard(null);
+            session.setMode(SessionMode.NORMAL);
+            sessionRepository.save(session);
+            sessionRepository.flush();
+        }
+
+        // Null out the currentPage FK before cascade-deleting pages
+        whiteboard.setCurrentPage(null);
+        personalWhiteboardRepository.save(whiteboard);
+        personalWhiteboardRepository.flush();
+
+        personalWhiteboardRepository.delete(whiteboard);
+        personalWhiteboardRepository.flush();
+        log.debug("Student {} left session {} and whiteboard deleted", user.getId(), sessionId);
+    }
+
     //End session
     public void endSession(Long sessionId, String token) {
         User user = getUserByToken(token);
@@ -247,11 +299,24 @@ public class SessionService {
         Session session = getSessionById(sessionId);
         validateSessionOwner(session, user);
 
+        // Deselect any student board and delete all personal whiteboards
+        session.setSelectedWhiteboard(null);
+        session.setMode(SessionMode.NORMAL);
         session.setActive(false);
-        chatMessageService.deleteSessionMessages(sessionId);
-
         sessionRepository.save(session);
         sessionRepository.flush();
+
+        List<PersonalWhiteboard> studentBoards = personalWhiteboardRepository.findBySessionSessionId(sessionId);
+        for (PersonalWhiteboard wb : studentBoards) {
+            wb.setCurrentPage(null);
+        }
+        personalWhiteboardRepository.saveAll(studentBoards);
+        personalWhiteboardRepository.flush();
+        personalWhiteboardRepository.deleteAll(studentBoards);
+        personalWhiteboardRepository.flush();
+
+        chatMessageService.deleteSessionMessages(sessionId);
+
         log.debug("Ended session {}", sessionId);
     }
 
