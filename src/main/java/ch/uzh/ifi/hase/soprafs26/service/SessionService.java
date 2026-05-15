@@ -306,52 +306,43 @@ public class SessionService {
         Session session = getSessionById(sessionId);
         validateSessionOwner(session, user);
 
+        // Export teacher whiteboard canvas to PDF before teardown
+        TeacherWhiteboard teacherWhiteboard = session.getTeacherWhiteboard();
+        if (teacherWhiteboard != null && teacherWhiteboard.getCurrentPage() != null) {
+            WhiteboardPage currentPage = teacherWhiteboard.getCurrentPage();
+            String canvasSnapshot = currentPage.getCanvasSnapshot();
+            if (canvasSnapshot != null && !canvasSnapshot.isBlank()) {
+                try {
+                    byte[] whiteboardPdf = createWhiteboardPdfFromCanvasSnapshot(canvasSnapshot);
+                    String encodedPdf = Base64.getEncoder().encodeToString(whiteboardPdf);
+                    currentPage.setBackgroundFile("data:application/pdf;base64," + encodedPdf);
+                    whiteboardPageRepository.save(currentPage);
+                } catch (ResponseStatusException e) {
+                    log.warn("Skipping whiteboard PDF export for session {}: {}", sessionId, e.getReason());
+                }
+            }
+        }
 
-        //End session
-  public void endSession(Long sessionId, String token) {                                                                                       
-      User user = getUserByToken(token);
-      validateTeacher(user);
+        // Deselect any student board and delete all personal whiteboards
+        session.setSelectedWhiteboard(null);
+        session.setMode(SessionMode.NORMAL);
+        session.setActive(false);
+        sessionRepository.save(session);
+        sessionRepository.flush();
 
-      Session session = getSessionById(sessionId);
-      validateSessionOwner(session, user);
-  
-      // Export teacher whiteboard canvas to PDF before teardown
-      TeacherWhiteboard teacherWhiteboard = session.getTeacherWhiteboard();
-      if (teacherWhiteboard != null && teacherWhiteboard.getCurrentPage() != null) {
-          WhiteboardPage currentPage = teacherWhiteboard.getCurrentPage();
-          String canvasSnapshot = currentPage.getCanvasSnapshot();
-          if (canvasSnapshot != null && !canvasSnapshot.isBlank()) {
-              try {
-                  byte[] whiteboardPdf = createWhiteboardPdfFromCanvasSnapshot(canvasSnapshot);
-                  String encodedPdf = Base64.getEncoder().encodeToString(whiteboardPdf);
-                  currentPage.setBackgroundFile("data:application/pdf;base64," + encodedPdf);
-                  whiteboardPageRepository.save(currentPage);
-              } catch (ResponseStatusException e) {
-                  log.warn("Skipping whiteboard PDF export for session {}: {}", sessionId, e.getReason());
-              }
-          }
-      }
+        List<PersonalWhiteboard> studentBoards = personalWhiteboardRepository.findBySessionSessionId(sessionId);
+        for (PersonalWhiteboard wb : studentBoards) {
+            wb.setCurrentPage(null);
+        }
+        personalWhiteboardRepository.saveAll(studentBoards);
+        personalWhiteboardRepository.flush();
+        personalWhiteboardRepository.deleteAll(studentBoards);
+        personalWhiteboardRepository.flush();
 
-      // Deselect any student board and delete all personal whiteboards
-      session.setSelectedWhiteboard(null);                                                                                                    
-      session.setMode(SessionMode.NORMAL);
-      session.setActive(false);
-      sessionRepository.save(session);
-      sessionRepository.flush();
+        chatMessageService.deleteSessionMessages(sessionId);
 
-      List<PersonalWhiteboard> studentBoards = personalWhiteboardRepository.findBySessionSessionId(sessionId);
-      for (PersonalWhiteboard wb : studentBoards) {
-          wb.setCurrentPage(null);
-      }
-      personalWhiteboardRepository.saveAll(studentBoards);
-      personalWhiteboardRepository.flush();
-      personalWhiteboardRepository.deleteAll(studentBoards);
-      personalWhiteboardRepository.flush();
-
-      chatMessageService.deleteSessionMessages(sessionId);
-
-      log.debug("Ended session {}", sessionId);
-  }
+        log.debug("Ended session {}", sessionId);
+    }
 
     private byte[] createWhiteboardPdfFromCanvasSnapshot(String canvasSnapshot) {
         BufferedImage image = decodeCanvasSnapshotImage(canvasSnapshot);
