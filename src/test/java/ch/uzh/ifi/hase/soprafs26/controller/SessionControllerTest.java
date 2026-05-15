@@ -226,6 +226,33 @@ public class SessionControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    /**
+     * POST /sessions/{sessionId}/end
+     */
+
+    @Test
+    void endSessionBySessionId_validRequest_returns204() throws Exception {
+        doNothing().when(sessionService).endSession(1L, "teacher-token");
+
+        MockHttpServletRequestBuilder request = post("/sessions/1/end")
+                .header("Authorization", "teacher-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void endSessionBySessionId_invalidToken_returns401() throws Exception {
+        doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token"))
+                .when(sessionService).endSession(1L, "invalid-token");
+
+        MockHttpServletRequestBuilder request = post("/sessions/1/end")
+                .header("Authorization", "invalid-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
 
     @Test
     void toggleCollaboration_enable_returns204() throws Exception {
@@ -302,6 +329,33 @@ public class SessionControllerTest {
 
         mockMvc.perform(request)
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getCourseWhiteboardPdf_success_returnsPdf() throws Exception {
+        byte[] pdfBytes = "pdf-bytes".getBytes(StandardCharsets.UTF_8);
+        given(sessionService.getCourseWhiteboardPdf(1L, "student-token")).willReturn(pdfBytes);
+
+        MockHttpServletRequestBuilder request = get("/courses/1/whiteboard-pdf")
+                .header("Authorization", "student-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition", "inline; filename=\"course-1-whiteboard.pdf\""))
+                .andExpect(content().bytes(pdfBytes));
+    }
+
+    @Test
+    void getCourseWhiteboardPdf_notEnrolled_returns403() throws Exception {
+        given(sessionService.getCourseWhiteboardPdf(1L, "outsider-token"))
+                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not part of this course"));
+
+        MockHttpServletRequestBuilder request = get("/courses/1/whiteboard-pdf")
+                .header("Authorization", "outsider-token");
+
+        mockMvc.perform(request)
+                .andExpect(status().isForbidden());
     }
 
     /**

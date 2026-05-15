@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -47,6 +48,7 @@ public class SessionServiceTest {
     private User student;
     private Course course;
     private Session session;
+    private WhiteboardPage teacherPage;
 
     @BeforeEach
     void setup() {
@@ -70,6 +72,14 @@ public class SessionServiceTest {
         session.setSessionId(1L);
         session.setActive(true);
         session.setCourse(course);
+
+        TeacherWhiteboard teacherWhiteboard = new TeacherWhiteboard();
+        teacherPage = new WhiteboardPage();
+        teacherPage.setPageNumber(1);
+        teacherPage.setCanvasSnapshot("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2wA8YAAAAASUVORK5CYII=");
+        teacherWhiteboard.addPage(teacherPage);
+        teacherWhiteboard.setCurrentPage(teacherPage);
+        session.setTeacherWhiteboard(teacherWhiteboard);
     }
 
     /**
@@ -153,6 +163,36 @@ public class SessionServiceTest {
 
         assertFalse(session.isActive());
         verify(sessionRepository).save(session);
+        verify(whiteboardPageRepository).save(argThat(page ->
+                page.getBackgroundFile() != null && page.getBackgroundFile().startsWith("data:application/pdf;base64,")));
+        verify(chatMessageService).deleteSessionMessages(1L);
+    }
+
+    @Test
+    void endSession_missingSnapshot_stillEndsSession() {
+        teacherPage.setCanvasSnapshot(null);
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        sessionService.endSession(1L, "teacher-token");
+
+        assertFalse(session.isActive());
+        verify(sessionRepository).save(session);
+        verify(whiteboardPageRepository, never()).save(any());
+        verify(chatMessageService).deleteSessionMessages(1L);
+    }
+
+    @Test
+    void endSession_invalidSnapshot_stillEndsSession() {
+        teacherPage.setCanvasSnapshot("not-base64-image");
+        when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(teacher));
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        sessionService.endSession(1L, "teacher-token");
+
+        assertFalse(session.isActive());
+        verify(sessionRepository).save(session);
+        verify(whiteboardPageRepository, never()).save(any());
         verify(chatMessageService).deleteSessionMessages(1L);
     }
 

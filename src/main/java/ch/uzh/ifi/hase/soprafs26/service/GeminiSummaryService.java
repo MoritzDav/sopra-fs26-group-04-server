@@ -34,6 +34,11 @@ public class GeminiSummaryService {
         this.objectMapper = new ObjectMapper();
     }
 
+    GeminiSummaryService(HttpClient httpClient, ObjectMapper objectMapper) {
+        this.httpClient = httpClient;
+        this.objectMapper = objectMapper;
+    }
+
     public String summarizeText(String text) {
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
