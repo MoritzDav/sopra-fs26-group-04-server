@@ -12,6 +12,8 @@ import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -181,7 +183,7 @@ public class WhiteboardWebSocketHandlerTest {
     }
 
     @Test
-    public void testHandleTextMessage_StudentStrokeNotBroadcastWhenCollaborationInactive() throws Exception {
+    public void testHandleTextMessage_StudentStrokeBroadcastRegardlessOfCollaborationMode() throws Exception {
         webSocketHandler.afterConnectionEstablished(mockSession1);
         webSocketHandler.afterConnectionEstablished(mockSession2);
 
@@ -196,8 +198,8 @@ public class WhiteboardWebSocketHandlerTest {
 
         webSocketHandler.handleTextMessage(mockSession1, new TextMessage(messageJson));
 
-        verify(mockSession1, never()).sendMessage(any(TextMessage.class));
-        verify(mockSession2, never()).sendMessage(any(TextMessage.class));
+        verify(mockSession1, atLeastOnce()).sendMessage(any(TextMessage.class));
+        verify(mockSession2, atLeastOnce()).sendMessage(any(TextMessage.class));
     }
 
     @Test
@@ -298,6 +300,49 @@ public class WhiteboardWebSocketHandlerTest {
         assertEquals(2, activeCourses.size());
         assertTrue(activeCourses.contains("1"));
         assertTrue(activeCourses.contains("2"));
+    }
+
+    @Test
+    public void testHandleTextMessage_BroadcastsExactPayload() throws Exception {
+        // Given
+        webSocketHandler.afterConnectionEstablished(mockSession1);
+        webSocketHandler.afterConnectionEstablished(mockSession2);
+
+        String payload = "{\"courseId\":1,\"userId\":100,\"action\":\"draw\",\"x\":5.0,\"y\":10.0}";
+        TextMessage textMessage = new TextMessage(payload);
+
+        // When
+        webSocketHandler.handleTextMessage(mockSession1, textMessage);
+
+        // Then
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(mockSession2, atLeastOnce()).sendMessage(captor.capture());
+        assertEquals(payload, captor.getValue().getPayload());
+    }
+
+    @Test
+    public void testAfterConnectionClosed_SessionNotRegistered_NoException() throws Exception {
+        // Given - session4 was never registered via afterConnectionEstablished
+        WebSocketSession unregistered = createMockSession("99", "http://localhost:8080/ws/whiteboard/1");
+
+        // When/Then - should not throw
+        assertDoesNotThrow(() -> webSocketHandler.afterConnectionClosed(unregistered, CloseStatus.NORMAL));
+        assertEquals(0, webSocketHandler.getConnectedCount("1"));
+    }
+
+    @Test
+    public void testHandleTextMessage_NoBroadcastForUnknownCourse() throws Exception {
+        // Given - mockSession1 is registered for course "1", message comes from course "999"
+        webSocketHandler.afterConnectionEstablished(mockSession1);
+        WebSocketSession unknownCourseSession = createMockSession("x", "http://localhost:8080/ws/whiteboard/999");
+
+        TextMessage textMessage = new TextMessage("{\"action\":\"draw\"}");
+
+        // When
+        webSocketHandler.handleTextMessage(unknownCourseSession, textMessage);
+
+        // Then - mockSession1 (course 1) should not receive anything
+        verify(mockSession1, never()).sendMessage(any(TextMessage.class));
     }
 
     // Helper method to create mock WebSocket session

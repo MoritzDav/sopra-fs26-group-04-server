@@ -22,7 +22,7 @@ public class PersonalWhiteboard extends Whiteboard {
     @JoinColumn(name = "session_id", nullable = false)
     private Session session;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_page_id")
     private WhiteboardPage currentPage;
 

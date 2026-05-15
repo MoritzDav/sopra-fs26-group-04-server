@@ -41,9 +41,9 @@ public class Session implements Serializable{
 
     @ManyToOne
     @JoinColumn(name = "course_id", nullable = false)
-    private Course course; 
+    private Course course;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_whiteboard_id")
     private TeacherWhiteboard teacherWhiteboard;
 

@@ -103,6 +103,16 @@ public class SessionController{
         sessionService.saveWhiteboardState(sessionId, token, dto.getCanvasSnapshot());
     }
 
+    //Student fetches their own saved canvas snapshot (e.g. on rejoin after browser close)
+    @GetMapping("/courses/{courseId}/sessions/{sessionId}/personal-whiteboard")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public WhiteboardStateDTO getPersonalWhiteboardState(@PathVariable Long courseId,
+                                                         @PathVariable Long sessionId,
+                                                         @RequestHeader("Authorization") String token) {
+        return sessionService.getPersonalWhiteboardState(sessionId, token);
+    }
+
     //Student saves his snapshot
     @PutMapping("/courses/{courseId}/sessions/{sessionId}/personal-whiteboard")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -111,6 +121,15 @@ public class SessionController{
                                             @RequestHeader("Authorization") String token,
                                             @RequestBody WhiteboardStateDTO dto) {
         sessionService.savePersonalWhiteboardState(courseId, sessionId, token, dto.getCanvasSnapshot());
+    }
+
+    //Student explicitly leaves the session — deletes their whiteboard state
+    @DeleteMapping("/courses/{courseId}/sessions/{sessionId}/leave")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void leaveSession(@PathVariable Long courseId,
+                             @PathVariable Long sessionId,
+                             @RequestHeader("Authorization") String token) {
+        sessionService.leaveSession(courseId, sessionId, token);
     }
 
     //Teacher fetches student snapshot
