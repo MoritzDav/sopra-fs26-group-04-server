@@ -18,7 +18,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -611,6 +611,11 @@ public class SessionService {
 
     private byte[] createSummaryPdf(String summaryText) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            // LiberationSans ships inside pdfbox.jar — full Unicode support, no sanitization needed
+            PDType0Font font = PDType0Font.load(document,
+                    getClass().getResourceAsStream("/org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf"),
+                    true);
+
             PDPage page = new PDPage(PDRectangle.A4);
             document.addPage(page);
 
@@ -620,22 +625,22 @@ public class SessionService {
             float maxWidth = page.getMediaBox().getWidth() - (2 * margin);
 
             PDPageContentStream contentStream = new PDPageContentStream(document, page);
-            contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
+            contentStream.setFont(font, 14);
             contentStream.beginText();
             contentStream.newLineAtOffset(margin, yPosition);
             contentStream.showText("PDF Summary");
             contentStream.endText();
 
             yPosition -= 28f;
-            contentStream.setFont(PDType1Font.HELVETICA, 11);
+            contentStream.setFont(font, 11);
 
-            for (String line : wrapText(summaryText, PDType1Font.HELVETICA, 11, maxWidth)) {
+            for (String line : wrapText(summaryText, font, 11, maxWidth)) {
                 if (yPosition <= margin) {
                     contentStream.close();
                     page = new PDPage(PDRectangle.A4);
                     document.addPage(page);
                     contentStream = new PDPageContentStream(document, page);
-                    contentStream.setFont(PDType1Font.HELVETICA, 11);
+                    contentStream.setFont(font, 11);
                     yPosition = page.getMediaBox().getHeight() - margin;
                 }
 
@@ -655,7 +660,7 @@ public class SessionService {
         }
     }
 
-    private List<String> wrapText(String text, PDType1Font font, float fontSize, float maxWidth) throws IOException {
+    private List<String> wrapText(String text, PDType0Font font, float fontSize, float maxWidth) throws IOException {
         List<String> wrappedLines = new ArrayList<>();
         for (String paragraph : text.split("\\r?\\n")) {
             if (paragraph.isBlank()) {
