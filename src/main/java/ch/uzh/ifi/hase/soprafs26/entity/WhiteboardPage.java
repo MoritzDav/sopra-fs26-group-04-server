@@ -16,6 +16,7 @@ public class WhiteboardPage implements Serializable{
     @Column(nullable = false)
     private int pageNumber;
 
+    @Lob
     @Column
     private String backgroundFile;
 
