@@ -99,6 +99,7 @@ public class UserService {
 		if (newUser.getPassword() == null || newUser.getPassword().isBlank()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must not be empty");
 		}
+		validatePasswordStrength(newUser.getPassword());
 
 		newUser.setToken(UUID.randomUUID().toString());
 
@@ -182,11 +183,27 @@ public class UserService {
 	 * username and the name
 	 * defined in the User entity. The method will do nothing if the input is unique
 	 * and throw an error otherwise.
-	 *
-	 * @param userToBeCreated
-	 * @throws org.springframework.web.server.ResponseStatusException
-	 * @see User
 	 */
+
+    private void validatePasswordStrength(String password) {
+        if (password.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Password must be at least 8 characters long.");
+        }
+        if (!password.matches(".*[A-Z].*")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Password must contain at least one uppercase letter.");
+        }
+        if (!password.matches(".*[a-z].*")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Password must contain at least one lowercase letter.");
+        }
+        if (!password.matches(".*[0-9].*")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Password must contain at least one digit.");
+        }
+    }
+
     private void checkIfUserExists(User userToBeCreated) {
         User userByUsername = userRepository.findByUsername(userToBeCreated.getUsername());
         if (userByUsername != null) {

@@ -126,6 +126,25 @@ public class UserControllerTest {
     }
 
 
+    @Test
+    public void createUser_weakPassword_returns400() throws Exception {
+        // service throws BAD_REQUEST when password fails strength rules
+        given(userService.createUser(any(User.class)))
+                .willThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password too weak"));
+
+        UserPostDTO dto = new UserPostDTO();
+        dto.setFirstName("Alice");
+        dto.setLastName("Wonder");
+        dto.setUsername("alice");
+        dto.setPassword("weak");
+        dto.setRole("STUDENT");
+
+        mockMvc.perform(post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(asJsonString(dto)))
+                .andExpect(status().isBadRequest());
+    }
+
     /**
      * POST /users/login
      */
