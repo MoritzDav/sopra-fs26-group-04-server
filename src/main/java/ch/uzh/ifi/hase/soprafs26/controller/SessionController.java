@@ -3,7 +3,11 @@ package ch.uzh.ifi.hase.soprafs26.controller;
 import ch.uzh.ifi.hase.soprafs26.entity.PersonalWhiteboard;
 import ch.uzh.ifi.hase.soprafs26.entity.SessionFile;
 import jakarta.persistence.PreUpdate;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -63,6 +67,14 @@ public class SessionController{
         sessionService.endSession(sessionId, token);
     }
 
+    @PostMapping("/sessions/{sessionId}/end")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void endSessionBySessionId(
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token) {
+        sessionService.endSession(sessionId, token);
+    }
+
     @PostMapping("/courses/{courseId}/sessions/{sessionId}/join")
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
@@ -91,6 +103,16 @@ public class SessionController{
         sessionService.saveWhiteboardState(sessionId, token, dto.getCanvasSnapshot());
     }
 
+    //Student fetches their own saved canvas snapshot (e.g. on rejoin after browser close)
+    @GetMapping("/courses/{courseId}/sessions/{sessionId}/personal-whiteboard")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public WhiteboardStateDTO getPersonalWhiteboardState(@PathVariable Long courseId,
+                                                         @PathVariable Long sessionId,
+                                                         @RequestHeader("Authorization") String token) {
+        return sessionService.getPersonalWhiteboardState(sessionId, token);
+    }
+
     //Student saves his snapshot
     @PutMapping("/courses/{courseId}/sessions/{sessionId}/personal-whiteboard")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -99,6 +121,15 @@ public class SessionController{
                                             @RequestHeader("Authorization") String token,
                                             @RequestBody WhiteboardStateDTO dto) {
         sessionService.savePersonalWhiteboardState(courseId, sessionId, token, dto.getCanvasSnapshot());
+    }
+
+    //Student explicitly leaves the session — deletes their whiteboard state
+    @DeleteMapping("/courses/{courseId}/sessions/{sessionId}/leave")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void leaveSession(@PathVariable Long courseId,
+                             @PathVariable Long sessionId,
+                             @RequestHeader("Authorization") String token) {
+        sessionService.leaveSession(courseId, sessionId, token);
     }
 
     //Teacher fetches student snapshot
@@ -134,6 +165,15 @@ public class SessionController{
         sessionService.deselectStudentBoard(courseId, sessionId, token, dto.getStudentId(), dto.getCanvasSnapshot());
     }
 
+    @PutMapping("/sessions/{sessionId}/collaboration")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void toggleCollaboration(
+            @PathVariable Long sessionId,
+            @RequestHeader("Authorization") String token,
+            @RequestBody SessionCollaborationDTO dto) {
+        sessionService.toggleCollaboration(sessionId, token, dto.isCollaborationActive());
+    }
+
     @GetMapping("/sessions/{sessionId}/files")
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
@@ -142,6 +182,19 @@ public class SessionController{
             @RequestHeader("Authorization") String token) {
         List<SessionFile> files = sessionService.getSessionFiles(sessionId, token);
         return files.stream().map(f -> toSessionFileGetDTO(f)).collect(Collectors.toList());
+    }
+
+    @GetMapping("/courses/{courseId}/whiteboard-pdf")
+    public ResponseEntity<byte[]> getCourseWhiteboardPdf(
+            @PathVariable Long courseId,
+            @RequestHeader("Authorization") String token) {
+        byte[] whiteboardPdf = sessionService.getCourseWhiteboardPdf(courseId, token);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.inline().filename("course-" + courseId + "-whiteboard.pdf").build());
+
+        return new ResponseEntity<>(whiteboardPdf, headers, HttpStatus.OK);
     }
 
     @PostMapping("/sessions/{sessionId}/files")
@@ -153,6 +206,20 @@ public class SessionController{
             @RequestParam("file") MultipartFile file) {
         SessionFile saved = sessionService.uploadSessionFile(sessionId, token, file);
         return toSessionFileGetDTO(saved);
+    }
+
+    @PostMapping("/sessions/{sessionId}/files/{fileId}/summarize")
+    public ResponseEntity<byte[]> summarizeSessionFile(
+            @PathVariable Long sessionId,
+            @PathVariable Long fileId,
+            @RequestHeader("Authorization") String token) {
+        byte[] summaryPdf = sessionService.summarizeSessionFileToPdf(sessionId, fileId, token);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment().filename("summary-" + fileId + ".pdf").build());
+
+        return new ResponseEntity<>(summaryPdf, headers, HttpStatus.OK);
     }
 
     private SessionFileGetDTO toSessionFileGetDTO(SessionFile f) {

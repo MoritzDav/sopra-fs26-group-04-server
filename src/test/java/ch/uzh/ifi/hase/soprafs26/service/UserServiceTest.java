@@ -11,9 +11,15 @@ import org.springframework.web.server.ResponseStatusException;
 
 import ch.uzh.ifi.hase.soprafs26.constant.UserStatus;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
+import ch.uzh.ifi.hase.soprafs26.entity.Course;
+import ch.uzh.ifi.hase.soprafs26.entity.CourseEnrollment;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.repository.CourseEnrollmentRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.UserPutDTO;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +36,12 @@ public class UserServiceTest {
 
 	@Mock
 	private UserRepository userRepository;
+
+	@Mock
+	private CourseRepository courseRepository;
+
+	@Mock
+	private CourseEnrollmentRepository courseEnrollmentRepository;
 
 	@InjectMocks
 	private UserService userService;
@@ -586,6 +598,233 @@ public class UserServiceTest {
 
 		// then - Status remains offline
 		assertEquals(UserStatus.OFFLINE, secondLogout.getStatus());
+	}
+
+	// ============ createUser Validation Tests ============
+
+	@Test
+	public void createUser_blankUsername_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername(" ");
+		newUser.setFirstName("Test");
+		newUser.setLastName("User");
+		newUser.setPassword("password123");
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
+	}
+
+	@Test
+	public void createUser_blankFirstName_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername("testuser");
+		newUser.setFirstName(" ");
+		newUser.setLastName("User");
+		newUser.setPassword("password123");
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+	}
+
+	@Test
+	public void createUser_blankLastName_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername("testuser");
+		newUser.setFirstName("Test");
+		newUser.setLastName(" ");
+		newUser.setPassword("password123");
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+	}
+
+	@Test
+	public void createUser_blankPassword_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername("testuser");
+		newUser.setFirstName("Test");
+		newUser.setLastName("User");
+		newUser.setPassword(" ");
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+	}
+
+	// ============ getUsers Tests ============
+
+	@Test
+	public void getUsers_returnsAllUsers() {
+		Mockito.when(userRepository.findAll()).thenReturn(List.of(testUser));
+
+		List<User> result = userService.getUsers();
+
+		assertEquals(1, result.size());
+		assertEquals(testUser.getId(), result.get(0).getId());
+	}
+
+	// ============ updateUser Tests ============
+
+	@Test
+	public void updateUser_validFirstAndLastName_success() {
+		UserPutDTO updates = new UserPutDTO();
+		updates.setFirstName("NewFirst");
+		updates.setLastName("NewLast");
+
+		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.save(Mockito.any())).thenReturn(testUser);
+
+		User result = userService.updateUser(1L, updates);
+
+		assertEquals("NewFirst", result.getFirstName());
+		assertEquals("NewLast", result.getLastName());
+		Mockito.verify(userRepository).save(testUser);
+	}
+
+	@Test
+	public void updateUser_validUsername_success() {
+		UserPutDTO updates = new UserPutDTO();
+		updates.setUsername("newusername");
+
+		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByUsername("newusername")).thenReturn(null);
+		Mockito.when(userRepository.save(Mockito.any())).thenReturn(testUser);
+
+		userService.updateUser(1L, updates);
+
+		assertEquals("newusername", testUser.getUsername());
+	}
+
+	@Test
+	public void updateUser_validPassword_success() {
+		UserPutDTO updates = new UserPutDTO();
+		updates.setOldPassword("password123");
+		updates.setNewPassword("newPassword456");
+
+		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.save(Mockito.any())).thenReturn(testUser);
+
+		userService.updateUser(1L, updates);
+
+		assertEquals("newPassword456", testUser.getPassword());
+	}
+
+	@Test
+	public void updateUser_userNotFound_throwsNotFound() {
+		Mockito.when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.updateUser(99L, new UserPutDTO()));
+
+		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+	}
+
+	@Test
+	public void updateUser_duplicateUsername_throwsConflict() {
+		UserPutDTO updates = new UserPutDTO();
+		updates.setUsername("taken");
+
+		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findByUsername("taken")).thenReturn(new User());
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.updateUser(1L, updates));
+
+		assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+	}
+
+	@Test
+	public void updateUser_wrongOldPassword_throwsUnauthorized() {
+		UserPutDTO updates = new UserPutDTO();
+		updates.setOldPassword("wrongpassword");
+		updates.setNewPassword("newPassword456");
+
+		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.updateUser(1L, updates));
+
+		assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+	}
+
+	@Test
+	public void updateUser_newPasswordSameAsOld_throwsConflict() {
+		UserPutDTO updates = new UserPutDTO();
+		updates.setOldPassword("password123");
+		updates.setNewPassword("password123");
+
+		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.updateUser(1L, updates));
+
+		assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+	}
+
+	// ============ getCoursesByUser Tests ============
+
+	@Test
+	public void getCoursesByUser_teacherRole_returnsTeacherCourses() {
+		testUser.setRole(UserRole.TEACHER);
+		Course course = new Course();
+		course.setId(10L);
+
+		Mockito.when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+		Mockito.when(courseRepository.findByTeacherId(1L)).thenReturn(List.of(course));
+
+		List<Course> result = userService.getCoursesByUser(1L, "teacher-token");
+
+		assertEquals(1, result.size());
+		assertEquals(10L, result.get(0).getId());
+	}
+
+	@Test
+	public void getCoursesByUser_studentRole_returnsEnrolledCourses() {
+		testUser.setRole(UserRole.STUDENT);
+		Course course = new Course();
+		course.setId(10L);
+
+		CourseEnrollment enrollment = new CourseEnrollment();
+		enrollment.setCourseId(10L);
+
+		Mockito.when(userRepository.findByToken("student-token")).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(testUser));
+		Mockito.when(courseEnrollmentRepository.findByStudentId(1L)).thenReturn(List.of(enrollment));
+		Mockito.when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
+
+		List<Course> result = userService.getCoursesByUser(2L, "student-token");
+
+		assertEquals(1, result.size());
+	}
+
+	@Test
+	public void getCoursesByUser_invalidToken_throwsUnauthorized() {
+		Mockito.when(userRepository.findByToken("invalid-token")).thenReturn(Optional.empty());
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.getCoursesByUser(1L, "invalid-token"));
+
+		assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+	}
+
+	@Test
+	public void getCoursesByUser_userNotFound_throwsNotFound() {
+		Mockito.when(userRepository.findByToken("teacher-token")).thenReturn(Optional.of(testUser));
+		Mockito.when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.getCoursesByUser(99L, "teacher-token"));
+
+		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
 	}
 
 	@Test

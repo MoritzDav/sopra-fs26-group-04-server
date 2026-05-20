@@ -1,12 +1,27 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 
 import ch.uzh.ifi.hase.soprafs26.rest.SessionWebSocketHandler;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.SessionBoardSelectDTO;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -37,6 +52,7 @@ public class SessionService {
     private final SessionWebSocketHandler sessionWebSocketHandler;
     private final PersonalWhiteboardRepository personalWhiteboardRepository;
     private final SessionFileRepository sessionFileRepository;
+    private final GeminiSummaryService geminiSummaryService;
 
 
     public SessionService(@Qualifier("sessionRepository") SessionRepository sessionRepository,
@@ -47,7 +63,8 @@ public class SessionService {
                           @Qualifier("courseEnrollmentRepository") CourseEnrollmentRepository courseEnrollmentRepository,
                           @Qualifier("personalWhiteboardRepository") PersonalWhiteboardRepository personalWhiteboardRepository,
                           @Qualifier("sessionFileRepository") SessionFileRepository sessionFileRepository,
-                          SessionWebSocketHandler sessionWebSocketHandler) {
+                          SessionWebSocketHandler sessionWebSocketHandler,
+                          GeminiSummaryService geminiSummaryService) {
         this.sessionRepository = sessionRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
@@ -57,6 +74,7 @@ public class SessionService {
         this.personalWhiteboardRepository = personalWhiteboardRepository;
         this.sessionFileRepository = sessionFileRepository;
         this.sessionWebSocketHandler = sessionWebSocketHandler;
+        this.geminiSummaryService = geminiSummaryService;
     }
 
     //Create and start session
@@ -228,6 +246,58 @@ public class SessionService {
         return dto;
     }
 
+    //Student fetches their own saved canvas state (e.g. after rejoining)
+    public WhiteboardStateDTO getPersonalWhiteboardState(Long sessionId, String token) {
+        User user = getUserByToken(token);
+
+        if (user.getRole() != UserRole.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can fetch their own whiteboard");
+        }
+
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(user.getId(), sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Personal whiteboard not found"));
+
+        WhiteboardStateDTO dto = new WhiteboardStateDTO();
+        if (whiteboard.getCurrentPage() != null) {
+            dto.setCanvasSnapshot(whiteboard.getCurrentPage().getCanvasSnapshot());
+        }
+        return dto;
+    }
+
+    //Student explicitly leaves the session — deletes their whiteboard data
+    public void leaveSession(Long courseId, Long sessionId, String token) {
+        User user = getUserByToken(token);
+
+        if (user.getRole() != UserRole.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can leave a session");
+        }
+
+        Session session = getSessionById(sessionId);
+
+        PersonalWhiteboard whiteboard = personalWhiteboardRepository
+                .findByOwnerIdAndSessionSessionId(user.getId(), sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Whiteboard not found"));
+
+        // If teacher is currently inspecting this board, deselect it first
+        if (whiteboard.getWhiteboardId().equals(
+                session.getSelectedWhiteboard() != null ? session.getSelectedWhiteboard().getWhiteboardId() : null)) {
+            session.setSelectedWhiteboard(null);
+            session.setMode(SessionMode.NORMAL);
+            sessionRepository.save(session);
+            sessionRepository.flush();
+        }
+
+        // Null out the currentPage FK before cascade-deleting pages
+        whiteboard.setCurrentPage(null);
+        personalWhiteboardRepository.save(whiteboard);
+        personalWhiteboardRepository.flush();
+
+        personalWhiteboardRepository.delete(whiteboard);
+        personalWhiteboardRepository.flush();
+        log.debug("Student {} left session {} and whiteboard deleted", user.getId(), sessionId);
+    }
+
     //End session
     public void endSession(Long sessionId, String token) {
         User user = getUserByToken(token);
@@ -236,12 +306,111 @@ public class SessionService {
         Session session = getSessionById(sessionId);
         validateSessionOwner(session, user);
 
-        session.setActive(false);
-        chatMessageService.deleteSessionMessages(sessionId);
+        // Export teacher whiteboard canvas to PDF before teardown
+        TeacherWhiteboard teacherWhiteboard = session.getTeacherWhiteboard();
+        if (teacherWhiteboard != null && teacherWhiteboard.getCurrentPage() != null) {
+            WhiteboardPage currentPage = teacherWhiteboard.getCurrentPage();
+            String canvasSnapshot = currentPage.getCanvasSnapshot();
+            if (canvasSnapshot != null && !canvasSnapshot.isBlank()) {
+                try {
+                    byte[] whiteboardPdf = createWhiteboardPdfFromCanvasSnapshot(canvasSnapshot);
+                    String encodedPdf = Base64.getEncoder().encodeToString(whiteboardPdf);
+                    currentPage.setBackgroundFile("data:application/pdf;base64," + encodedPdf);
+                    whiteboardPageRepository.save(currentPage);
+                } catch (ResponseStatusException e) {
+                    log.warn("Skipping whiteboard PDF export for session {}: {}", sessionId, e.getReason());
+                }
+            }
+        }
 
+        // Deselect any student board and delete all personal whiteboards
+        session.setSelectedWhiteboard(null);
+        session.setMode(SessionMode.NORMAL);
+        session.setActive(false);
         sessionRepository.save(session);
         sessionRepository.flush();
+
+        List<PersonalWhiteboard> studentBoards = personalWhiteboardRepository.findBySessionSessionId(sessionId);
+        for (PersonalWhiteboard wb : studentBoards) {
+            wb.setCurrentPage(null);
+        }
+        personalWhiteboardRepository.saveAll(studentBoards);
+        personalWhiteboardRepository.flush();
+        personalWhiteboardRepository.deleteAll(studentBoards);
+        personalWhiteboardRepository.flush();
+
+        chatMessageService.deleteSessionMessages(sessionId);
+
         log.debug("Ended session {}", sessionId);
+    }
+
+    private byte[] createWhiteboardPdfFromCanvasSnapshot(String canvasSnapshot) {
+        BufferedImage image = decodeCanvasSnapshotImage(canvasSnapshot);
+
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            PDRectangle pageSize = PDRectangle.A4;
+            PDPage page = new PDPage(pageSize);
+            document.addPage(page);
+
+            PDImageXObject imageObject = LosslessFactory.createFromImage(document, image);
+
+            float margin = 36f;
+            float maxWidth = pageSize.getWidth() - (2 * margin);
+            float maxHeight = pageSize.getHeight() - (2 * margin);
+
+            float imageWidth = image.getWidth();
+            float imageHeight = image.getHeight();
+            float scale = Math.min(maxWidth / imageWidth, maxHeight / imageHeight);
+
+            float drawWidth = imageWidth * scale;
+            float drawHeight = imageHeight * scale;
+            float x = (pageSize.getWidth() - drawWidth) / 2f;
+            float y = (pageSize.getHeight() - drawHeight) / 2f;
+
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
+                contentStream.drawImage(imageObject, x, y, drawWidth, drawHeight);
+            }
+
+            document.save(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate whiteboard PDF");
+        }
+    }
+
+    private BufferedImage decodeCanvasSnapshotImage(String canvasSnapshot) {
+        String data = canvasSnapshot.trim();
+
+        if (data.startsWith("data:")) {
+            int commaIndex = data.indexOf(',');
+            if (commaIndex < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Canvas snapshot is malformed");
+            }
+
+            String metadata = data.substring(0, commaIndex).toLowerCase();
+            if (!metadata.startsWith("data:image/")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Canvas snapshot is not an image");
+            }
+
+            data = data.substring(commaIndex + 1);
+        }
+
+        byte[] imageBytes;
+        try {
+            imageBytes = Base64.getDecoder().decode(data);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Canvas snapshot cannot be decoded");
+        }
+
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (image == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Canvas snapshot image format is unsupported");
+            }
+            return image;
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Canvas snapshot cannot be parsed as an image");
+        }
     }
 
     //Display sessions in a course dashboard
@@ -287,7 +456,7 @@ public class SessionService {
         sessionRepository.save(session);
         sessionRepository.flush();
 
-        sessionWebSocketHandler.broadcastStudentBoardSelected(sessionId.toString(), studentId, null);
+        sessionWebSocketHandler.broadcastCollaborationStart(sessionId.toString(), studentId, whiteboard.getWhiteboardId());
         log.debug("Teacher selected student {} board in session {}", studentId, sessionId);
     }
 
@@ -314,8 +483,33 @@ public class SessionService {
         sessionRepository.save(session);
         sessionRepository.flush();
 
-        sessionWebSocketHandler.broadcastStudentBoardDeselected(sessionId.toString());
+        sessionWebSocketHandler.broadcastCollaborationEnd(sessionId.toString());
         log.debug("Teacher deselected student board in session {}", sessionId);
+    }
+
+    public void toggleCollaboration(Long sessionId, String token, boolean collaborationActive) {
+        User user = getUserByToken(token);
+        validateTeacher(user);
+
+        Session session = getSessionById(sessionId);
+        validateSessionOwner(session, user);
+
+        if (collaborationActive) {
+            session.setMode(SessionMode.MULTI_MODE);
+            session.setSelectedWhiteboard(null);
+            sessionRepository.save(session);
+            sessionRepository.flush();
+            sessionWebSocketHandler.broadcastCollaborationStart(sessionId.toString(), null, null);
+            log.debug("Enabled collaboration mode in session {}", sessionId);
+            return;
+        }
+
+        session.setMode(SessionMode.NORMAL);
+        session.setSelectedWhiteboard(null);
+        sessionRepository.save(session);
+        sessionRepository.flush();
+        sessionWebSocketHandler.broadcastCollaborationEnd(sessionId.toString());
+        log.debug("Disabled collaboration mode in session {}", sessionId);
     }
 
 
@@ -323,6 +517,37 @@ public class SessionService {
         getUserByToken(token);
         getSessionById(sessionId);
         return sessionFileRepository.findBySessionSessionId(sessionId);
+    }
+
+    public byte[] getCourseWhiteboardPdf(Long courseId, String token) {
+        User user = getUserByToken(token);
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+
+        boolean isTeacher = course.getTeacher().getId().equals(user.getId());
+        boolean isStudent = courseEnrollmentRepository.findByStudentIdAndCourseId(user.getId(), courseId).isPresent();
+        if (!isTeacher && !isStudent) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not part of this course");
+        }
+
+        List<Session> sessions = sessionRepository.findByCourseId(courseId);
+        sessions.sort(Comparator.comparing(Session::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+
+        for (Session session : sessions) {
+            if (session.getTeacherWhiteboard() == null || session.getTeacherWhiteboard().getCurrentPage() == null) {
+                continue;
+            }
+
+            String backgroundFile = session.getTeacherWhiteboard().getCurrentPage().getBackgroundFile();
+            if (backgroundFile == null || backgroundFile.isBlank()) {
+                continue;
+            }
+
+            return decodeStoredPdf(backgroundFile);
+        }
+
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No teacher whiteboard PDF found for this course");
     }
 
     public SessionFile uploadSessionFile(Long sessionId, String token, MultipartFile file) {
@@ -353,6 +578,140 @@ public class SessionService {
 
         log.debug("Uploaded file {} to session {}", file.getOriginalFilename(), sessionId);
         return sessionFile;
+    }
+
+    public byte[] summarizeSessionFileToPdf(Long sessionId, Long fileId, String token) {
+        getUserByToken(token);
+        getSessionById(sessionId);
+
+        SessionFile sessionFile = sessionFileRepository.findByIdAndSessionSessionId(fileId, sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found in session"));
+
+        if (!"application/pdf".equals(sessionFile.getFileType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF files can be summarized");
+        }
+
+        String extractedText = extractTextFromPdf(sessionFile.getData());
+        if (extractedText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No extractable text found in PDF");
+        }
+
+        String summaryText = geminiSummaryService.summarizeText(extractedText);
+        return createSummaryPdf(summaryText);
+    }
+
+    private String extractTextFromPdf(byte[] pdfData) {
+        try (PDDocument document = PDDocument.load(pdfData)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            return stripper.getText(document).trim();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Failed to parse PDF content");
+        }
+    }
+
+    private byte[] createSummaryPdf(String summaryText) {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            // LiberationSans ships inside pdfbox.jar — full Unicode support, no sanitization needed
+            PDType0Font font = PDType0Font.load(document,
+                    getClass().getResourceAsStream("/org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf"),
+                    true);
+
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+
+            float margin = 50f;
+            float yPosition = page.getMediaBox().getHeight() - margin;
+            float leading = 16f;
+            float maxWidth = page.getMediaBox().getWidth() - (2 * margin);
+
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+            contentStream.setFont(font, 14);
+            contentStream.beginText();
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText("PDF Summary");
+            contentStream.endText();
+
+            yPosition -= 28f;
+            contentStream.setFont(font, 11);
+
+            for (String line : wrapText(summaryText, font, 11, maxWidth)) {
+                if (yPosition <= margin) {
+                    contentStream.close();
+                    page = new PDPage(PDRectangle.A4);
+                    document.addPage(page);
+                    contentStream = new PDPageContentStream(document, page);
+                    contentStream.setFont(font, 11);
+                    yPosition = page.getMediaBox().getHeight() - margin;
+                }
+
+                contentStream.beginText();
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText(line);
+                contentStream.endText();
+                yPosition -= leading;
+            }
+
+            contentStream.close();
+            document.save(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to generate summary PDF");
+        }
+    }
+
+    private List<String> wrapText(String text, PDType0Font font, float fontSize, float maxWidth) throws IOException {
+        List<String> wrappedLines = new ArrayList<>();
+        for (String paragraph : text.split("\\r?\\n")) {
+            if (paragraph.isBlank()) {
+                wrappedLines.add("");
+                continue;
+            }
+
+            String[] words = paragraph.split("\\s+");
+            StringBuilder currentLine = new StringBuilder();
+            for (String word : words) {
+                String candidate = currentLine.isEmpty() ? word : currentLine + " " + word;
+                float width = font.getStringWidth(candidate) / 1000 * fontSize;
+                if (width <= maxWidth) {
+                    currentLine = new StringBuilder(candidate);
+                } else {
+                    if (!currentLine.isEmpty()) {
+                        wrappedLines.add(currentLine.toString());
+                    }
+                    currentLine = new StringBuilder(word);
+                }
+            }
+
+            if (!currentLine.isEmpty()) {
+                wrappedLines.add(currentLine.toString());
+            }
+        }
+        return wrappedLines;
+    }
+
+    private byte[] decodeStoredPdf(String storedValue) {
+        String data = storedValue.trim();
+
+        if (data.startsWith("data:")) {
+            int commaIndex = data.indexOf(',');
+            if (commaIndex < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored teacher PDF is malformed");
+            }
+
+            String metadata = data.substring(0, commaIndex).toLowerCase();
+            if (!metadata.contains("application/pdf")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored teacher file is not a PDF");
+            }
+
+            data = data.substring(commaIndex + 1);
+        }
+
+        try {
+            return Base64.getDecoder().decode(data);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored teacher PDF cannot be decoded");
+        }
     }
 
     //Helper functions

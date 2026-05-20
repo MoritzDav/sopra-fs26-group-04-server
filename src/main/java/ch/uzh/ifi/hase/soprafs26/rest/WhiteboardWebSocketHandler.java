@@ -1,13 +1,12 @@
 package ch.uzh.ifi.hase.soprafs26.rest;
 
+import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.WhiteboardDrawingMessage;
-
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -16,12 +15,11 @@ import java.util.Map;
 import java.util.Set;
 
 
- //Manages client connections per course and broadcasts drawing events.
-
 @Component
 public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
-    
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    private final SessionRepository sessionRepository;
+    private final UserRepository userRepository;
     
     /**
      * Map to store connected sessions per course.
@@ -29,6 +27,11 @@ public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
      */
     private final Map<String, Set<WebSocketSession>> courseConnections = 
         Collections.synchronizedMap(new HashMap<>());
+
+    public WhiteboardWebSocketHandler(SessionRepository sessionRepository, UserRepository userRepository) {
+        this.sessionRepository = sessionRepository;
+        this.userRepository = userRepository;
+    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -67,20 +70,7 @@ public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
         String uri = session.getUri().toString();
         String courseId = extractCourseId(uri);
-        
-        try {
-            // Parse drawing message
-            WhiteboardDrawingMessage drawingMessage = objectMapper.readValue(
-                message.getPayload(), 
-                WhiteboardDrawingMessage.class
-            );
-            
-            // Broadcast to all connected clients in the same course
-            broadcastMessage(courseId, message.getPayload());
-            
-        } catch (Exception e) {
-            System.err.println("Error processing drawing message: " + e.getMessage());
-        }
+        broadcastMessage(courseId, message.getPayload());
     }
 
     /**
@@ -118,14 +108,11 @@ public class WhiteboardWebSocketHandler extends TextWebSocketHandler {
         return "unknown";
     }
 
-    //Get the number of connected sessions for a specific course.
-   
     public int getConnectedCount(String courseId) {
         Set<WebSocketSession> sessions = courseConnections.get(courseId);
         return sessions != null ? sessions.size() : 0;
     }
 
-    // Get all course IDs with active connections.
     public Set<String> getActiveCourses() {
         return new HashSet<>(courseConnections.keySet());
     }

@@ -64,28 +64,34 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
         System.err.println("WebSocket session transport error: " + exception.getMessage());
     }
-
-    /**
-     * Broadcast student-board-selected event to all participants in a session.
-     * @param sessionId the session ID
-     * @param studentId the selected student ID
-     * @param whiteboardId the selected whiteboard ID
-     */
     public void broadcastStudentBoardSelected(String sessionId, Long studentId, Long whiteboardId) {
+        broadcastCollaborationStart(sessionId, studentId, whiteboardId);
+    }
+
+    //Broadcast student-board-deselected event to all participants in a session.
+    
+    public void broadcastStudentBoardDeselected(String sessionId) {
+        broadcastCollaborationEnd(sessionId);
+    }
+
+
+    public void broadcastCollaborationStart(String sessionId, Long studentId, Long whiteboardId) {
         Map<String, Object> event = new HashMap<>();
-        event.put("type", "student-board-selected");
+        event.put("type", "collaboration-start");
+        event.put("mode", "STUDENT");
         event.put("studentId", studentId);
         event.put("whiteboardId", whiteboardId);
         broadcastEvent(sessionId, event);
     }
 
     /**
-     * Broadcast student-board-deselected event to all participants in a session.
+     * Broadcast collaboration-end event to all participants in a session.
      * @param sessionId the session ID
      */
-    public void broadcastStudentBoardDeselected(String sessionId) {
+    public void broadcastCollaborationEnd(String sessionId) {
         Map<String, Object> event = new HashMap<>();
-        event.put("type", "student-board-deselected");
+        event.put("type", "collaboration-end");
+        event.put("mode", "NORMAL");
         broadcastEvent(sessionId, event);
     }
 
