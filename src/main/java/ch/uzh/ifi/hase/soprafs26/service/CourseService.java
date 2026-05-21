@@ -17,7 +17,7 @@ import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 
-import java.util.Random;
+import java.security.SecureRandom;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
@@ -39,7 +39,7 @@ public class CourseService {
     
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int CODE_LENGTH = 6;
-    private static final Random RANDOM = new Random();
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
