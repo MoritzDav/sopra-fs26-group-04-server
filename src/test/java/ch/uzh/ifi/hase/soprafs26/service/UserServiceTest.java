@@ -85,7 +85,7 @@ public class UserServiceTest {
 		newUser.setFirstName("Test");
 		newUser.setLastName("User");
 		newUser.setUsername("testuser");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 		newUser.setRole(UserRole.STUDENT);
 
 		Mockito.when(userRepository.findByUsername(Mockito.any())).thenReturn(null);
@@ -114,7 +114,7 @@ public class UserServiceTest {
 		newUser.setFirstName("Test");
 		newUser.setLastName("User");
 		newUser.setUsername("testuser");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 
 		// Mock that username already exists
 		Mockito.when(userRepository.findByUsername("testuser")).thenReturn(testUser);
@@ -137,7 +137,7 @@ public class UserServiceTest {
 		newUser.setFirstName("Test");
 		newUser.setLastName("User");
 		newUser.setUsername("newuser");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 		newUser.setRole(null); // No role provided
 
 		testUser.setRole(UserRole.STUDENT); // Default set to STUDENT
@@ -159,7 +159,7 @@ public class UserServiceTest {
 		newUser.setFirstName("Test");
 		newUser.setLastName("User");
 		newUser.setUsername("newuser");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 
 		Mockito.when(userRepository.findByUsername(Mockito.any())).thenReturn(null);
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(testUser);
@@ -178,7 +178,7 @@ public class UserServiceTest {
 		newUser.setFirstName("Test");
 		newUser.setLastName("User");
 		newUser.setUsername("newuser");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 
 		Mockito.when(userRepository.findByUsername(Mockito.any())).thenReturn(null);
 		Mockito.when(userRepository.save(Mockito.any())).thenReturn(testUser);
@@ -198,7 +198,7 @@ public class UserServiceTest {
 		newUser.setFirstName("Prof");
 		newUser.setLastName("Smith");
 		newUser.setUsername("prof_smith");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 		newUser.setRole(UserRole.TEACHER);
 
 		testUser.setRole(UserRole.TEACHER);
@@ -376,7 +376,7 @@ public class UserServiceTest {
 		user1.setFirstName("User");
 		user1.setLastName("One");
 		user1.setUsername("user1");
-		user1.setPassword("pass1");
+		user1.setPassword("SecurePass1");
 
 		User createdUser1 = new User();
 		createdUser1.setId(1L);
@@ -454,13 +454,13 @@ public class UserServiceTest {
 		user1.setFirstName("User1");
 		user1.setLastName("One");
 		user1.setUsername("user1");
-		user1.setPassword("pass1");
+		user1.setPassword("SecurePass1");
 
 		User user2 = new User();
 		user2.setFirstName("User2");
 		user2.setLastName("Two");
 		user2.setUsername("user2");
-		user2.setPassword("pass2");
+		user2.setPassword("SecurePass2");
 
 		User created1 = new User();
 		created1.setId(1L);
@@ -608,7 +608,7 @@ public class UserServiceTest {
 		newUser.setUsername(" ");
 		newUser.setFirstName("Test");
 		newUser.setLastName("User");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
 				() -> userService.createUser(newUser));
@@ -623,7 +623,7 @@ public class UserServiceTest {
 		newUser.setUsername("testuser");
 		newUser.setFirstName(" ");
 		newUser.setLastName("User");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
 				() -> userService.createUser(newUser));
@@ -637,7 +637,7 @@ public class UserServiceTest {
 		newUser.setUsername("testuser");
 		newUser.setFirstName("Test");
 		newUser.setLastName(" ");
-		newUser.setPassword("password123");
+		newUser.setPassword("SecurePass1");
 
 		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
 				() -> userService.createUser(newUser));
@@ -657,6 +657,66 @@ public class UserServiceTest {
 				() -> userService.createUser(newUser));
 
 		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+	}
+
+	@Test
+	public void createUser_passwordTooShort_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername("testuser");
+		newUser.setFirstName("Test");
+		newUser.setLastName("User");
+		newUser.setPassword("Ab1");  // only 3 chars
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
+	}
+
+	@Test
+	public void createUser_passwordNoUppercase_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername("testuser");
+		newUser.setFirstName("Test");
+		newUser.setLastName("User");
+		newUser.setPassword("abcdefg1");  // no uppercase
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
+	}
+
+	@Test
+	public void createUser_passwordNoLowercase_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername("testuser");
+		newUser.setFirstName("Test");
+		newUser.setLastName("User");
+		newUser.setPassword("ABCDEFG1");  // no lowercase
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
+	}
+
+	@Test
+	public void createUser_passwordNoDigit_throwsBadRequest() {
+		User newUser = new User();
+		newUser.setUsername("testuser");
+		newUser.setFirstName("Test");
+		newUser.setLastName("User");
+		newUser.setPassword("Abcdefgh");  // no digit
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> userService.createUser(newUser));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
 	}
 
 	// ============ getUsers Tests ============

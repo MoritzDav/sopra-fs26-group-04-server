@@ -1,118 +1,207 @@
-# SoPra RESTful Service Template FS26
+# Virtual Classroom – Backend
 
-## Getting started with Spring Boot
--   Documentation: https://docs.spring.io/spring-boot/docs/current/reference/html/index.html
--   Guides: http://spring.io/guides
-    -   Building a RESTful Web Service: http://spring.io/guides/gs/rest-service/
-    -   Building REST services with Spring: https://spring.io/guides/tutorials/rest/
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-17-blue.svg)](https://www.oracle.com/java/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.0-green.svg)](https://spring.io/projects/spring-boot)
 
-## Setup this Template with your IDE of choice
-Download your IDE of choice (e.g., [IntelliJ](https://www.jetbrains.com/idea/download/), [Visual Studio Code](https://code.visualstudio.com/), or [Eclipse](http://www.eclipse.org/downloads/)). Make sure Java 17 is installed on your system (for Windows, please make sure your `JAVA_HOME` environment variable is set to the correct version of Java).
+## Introduction
 
-### IntelliJ
-If you consider to use IntelliJ as your IDE of choice, you can make use of your free educational license [here](https://www.jetbrains.com/community/education/#students).
-1. File -> Open... -> SoPra server template
-2. Accept to import the project as a `gradle project`
-3. To build right click the `build.gradle` file and choose `Run Build`
+**Virtual Classroom** is an interactive teaching platform that connects teachers and students in real-time collaborative sessions. The idea is to bring the classroom onto the tablets live and directly such that students can immediately answer questions of the teacher. Each on their own but the teachers can share the different whiteboards with the whole class. Teachers create courses, start live sessions, and share whiteboards with their class. Students join via QR code, draw on personal whiteboards, chat with peers, and earn Brownie Points for participation. Uploaded session documents can be summarised instantly using AI.
 
-### VS Code
-The following extensions can help you get started more easily:
--   `vmware.vscode-spring-boot`
--   `vscjava.vscode-spring-initializr`
--   `vscjava.vscode-spring-boot-dashboard`
--   `vscjava.vscode-java-pack`
+This repository contains the **REST + WebSocket back-end**. The matching front-end lives in [sopra-fs26-group-04-client](https://github.com/sopra-fs26-group-04/sopra-fs26-group-04-client).
 
-**Note:** You'll need to build the project first with Gradle, just click on the `build` command in the _Gradle Tasks_ extension. Then check the _Spring Boot Dashboard_ extension if it already shows `soprafs26` and hit the play button to start the server. If it doesn't show up, restart VS Code and check again.
+---
 
-## Building with Gradle
-You can use the local Gradle Wrapper to build the application.
--   macOS: `./gradlew`
--   Linux: `./gradlew`
--   Windows: `./gradlew.bat`
+## Technologies
 
-More Information about [Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html) and [Gradle](https://gradle.org/docs/).
+| Layer            | Technology                       |
+|------------------|----------------------------------|
+| Language         | Java 17                          |
+| Framework        | Spring Boot 4.0                  |
+| Persistence      | Spring Data JPA · H2 (in-memory) |
+| Real-time        | Spring WebSocket                 |
+| DTO mapping      | MapStruct                        |
+| AI summary       | Google Gemini API                |
+| QR codes         | ZXing (Google)                   |
+| PDF parsing      | Apache PDFBox                    |
+| Build            | Gradle 9                         |
+| CI quality       | SonarQube · JaCoCo               |
+| Containerisation | Docker                           |
 
-### Build
+---
 
+## High-Level Components
+
+### 1. REST Controllers
+[`controller/`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller)
+
+Four controllers expose the HTTP API:
+
+| Controller | Responsibility                                                          |
+|------------|-------------------------------------------------------------------------|
+| [`UserController`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller/UserController.java) | Registration, login, logout, profile update                             |
+| [`CourseController`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller/CourseController.java) | Course CRUD, QR-code enrollment, email invite                           |
+| [`SessionController`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller/SessionController.java) | Session lifecycle, whiteboard state, file management system, AI summary |
+| [`BrowniePointController`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller/BrowniePointController.java) | Award students with points, fetch leaderboard                           |
+
+---
+
+### 2. Service Layer
+[`service/`](src/main/java/ch/uzh/ifi/hase/soprafs26/service)
+
+Business logic and authorisation live here, isolated from HTTP concerns. Key services:
+
+- [`UserService`](src/main/java/ch/uzh/ifi/hase/soprafs26/service/UserService.java) – token-based auth, password-strength enforcement
+- [`SessionService`](src/main/java/ch/uzh/ifi/hase/soprafs26/service/SessionService.java) – session state machine, whiteboard coordination, file management
+- [`GeminiSummaryService`](src/main/java/ch/uzh/ifi/hase/soprafs26/service/GeminiSummaryService.java) – sends extracted PDF text to Google Gemini and returns a structured summary
+
+---
+
+### 3. WebSocket Handlers
+[`rest/`](src/main/java/ch/uzh/ifi/hase/soprafs26/rest)
+
+Three handlers provide push-based real-time communication:
+
+| Handler | Endpoint | Purpose |
+|---------|----------|---------|
+| [`ChatWebSocketHandler`](src/main/java/ch/uzh/ifi/hase/soprafs26/rest/ChatWebSocketHandler.java) | `/ws/chat/{sessionId}` | Persist and broadcast chat messages |
+| [`WhiteboardWebSocketHandler`](src/main/java/ch/uzh/ifi/hase/soprafs26/rest/WhiteboardWebSocketHandler.java) | `/ws/whiteboard/{courseId}` | Broadcast drawing strokes to all participants |
+| [`SessionWebSocketHandler`](src/main/java/ch/uzh/ifi/hase/soprafs26/rest/SessionWebSocketHandler.java) | `/ws/session/{sessionId}` | Broadcast session-mode events (collaboration start/end) |
+
+---
+
+### 4. Domain Model
+[`entity/`](src/main/java/ch/uzh/ifi/hase/soprafs26/entity)
+
+Core JPA entities and their relationships:
+
+```
+User ──< CourseEnrollment >── Course ──< Session
+                                           │
+                                   TeacherWhiteboard
+                                   PersonalWhiteboard ──< WhiteboardPage
+                                   ChatMessage
+                                   SessionFile
+                                   BrowniePointEntry
+```
+
+---
+
+## Launch & Deployment
+
+### Prerequisites
+- **Java 17** (JDK)
+- **Git**
+- **Gemini API Key** (optional – only needed for the AI summary feature)
+
+### 1. Clone & configure
+```bash
+git clone https://github.com/sopra-fs26-group-04/sopra-fs26-group-04-server.git
+cd sopra-fs26-group-04-server
+```
+
+Create `local.properties` in the project root (gitignored):
+```properties
+GEMINI_API_KEY=your-key-here
+GEMINI_API_MODEL=gemini-1.5-flash   # optional, this is the default
+```
+
+### 2. Build
 ```bash
 ./gradlew build
 ```
 
-### Run
-
+### 3. Run locally
 ```bash
 ./gradlew bootRun
 ```
 
-You can verify that the server is running by visiting `localhost:8080` in your browser.
+The API is now available at `http://localhost:8080`.  
+H2 console (database browser): `http://localhost:8080/h2-console`
+- JDBC URL: `jdbc:h2:mem:testdb`
+- Username: `sa` · Password: *(empty)*
 
-### Test
-
+### 4. Run tests
 ```bash
+# All tests
 ./gradlew test
+
+# Specific test class
+./gradlew test --tests "ch.uzh.ifi.hase.soprafs26.service.UserServiceTest"
 ```
 
-### Development Mode
-You can start the backend in development mode, this will automatically trigger a new build and reload the application
-once the content of a file has been changed.
+Coverage report: `build/reports/jacoco/test/html/index.html`
 
-Start two terminal windows and run:
+### 5. Development mode
+Run both commands in separate terminals for hot-reload on file changes:
+```bash
+./gradlew build --continuous -xtest
+./gradlew bootRun
+```
 
-`./gradlew build --continuous`
+### 6. Release / deployment
+```bash
+# Build a runnable JAR
+./gradlew bootJar
 
-and in the other one:
+# The JAR is located at:
+build/libs/sopra-fs26-group-04-server-*.jar
 
-`./gradlew bootRun`
+# Run it
+java -jar build/libs/sopra-fs26-group-04-server-*.jar \
+  --GEMINI_API_KEY=your-key
+```
 
-If you want to avoid running all tests with every change, use the following command instead:
+For production deployments (e.g. Google Cloud Run / Docker), set the environment
+variables `GEMINI_API_KEY` and `GEMINI_API_MODEL` in your deployment configuration.
 
-`./gradlew build --continuous -xtest`
+#### Docker
+```bash
+# Pull the latest image from Docker Hub
+docker pull <dockerhub_username>/sopra-fs26-group-04-server
 
-## API Endpoint Testing with Postman
-We recommend using [Postman](https://www.getpostman.com) to test your API Endpoints.
+# Run the container
+docker run -p 8080:8080 \
+  -e GEMINI_API_KEY=your-key \
+  <dockerhub_username>/sopra-fs26-group-04-server
+```
 
-## Debugging
-If something is not working and/or you don't know what is going on. We recommend using a debugger and step-through the process step-by-step.
 
-To configure a debugger for SpringBoot's Tomcat servlet (i.e. the process you start with `./gradlew bootRun` command), do the following:
 
-1. Open Tab: **Run**/Edit Configurations
-2. Add a new Remote Configuration and name it properly
-3. Start the Server in Debug mode: `./gradlew bootRun --debug-jvm`
-4. Press `Shift + F9` or the use **Run**/Debug "Name of your task"
-5. Set breakpoints in the application where you need it
-6. Step through the process one step at a time
+## Roadmap
 
-## Testing
-Have a look here: https://www.baeldung.com/spring-boot-testing
+Contributions are welcome! Here are the top features we suggest tackling next:
 
-<br>
-<br>
-<br>
+1. **Persistent database**  
+   Replace the in-memory H2 database with a PostgreSQL instance so that courses, sessions, and whiteboard snapshots survive server restarts. Add a `docker-compose.yml` so developers can spin up the database with one command.
 
-## Docker
+2. **Password hashing**  
+   Passwords are currently stored as plain text (flagged in the code as "for testing only"). Integrate BCrypt (available via Spring Security) to hash passwords at registration and verify them at login.
 
-### Introduction
-This year Docker will be used to ease the process of deployment.\
-Docker is a tool that uses containers as isolated environments, ensuring that the application runs consistently and uniformly across different devices.\
-Everything in this repository is already set up to minimize your effort for deployment.\
-All changes to the main branch will automatically be pushed to dockerhub and optimized for production.
+3. **Session recording & playback**  
+   Persist every whiteboard stroke event with a timestamp so a session can be replayed step-by-step after it ends – useful for students who missed the live session.
 
-### Setup
-1. **One** member of the team should create an account on [dockerhub](https://hub.docker.com/), _incorporating the group number into the account name_, for example, `SoPra_group_XX`.\
-2. This account then creates a repository on dockerhub with the _same name as the group's Github repository name_.\
-3. Finally, the person's account details need to be added as [secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-a-repository) to the group's repository:
-    - dockerhub_username (the username of the dockerhub account from step 1, for example, `SoPra_group_XX`)
-    - dockerhub_password (a generated PAT([personal access token](https://docs.docker.com/docker-hub/access-tokens/)) of the account with read and write access)
-    - dockerhub_repo_name (the name of the dockerhub repository from step 2)
+---
 
-### Pull and run
-Once the image is created and has been successfully pushed to dockerhub, the image can be run on any machine.\
-Ensure that [Docker](https://www.docker.com/) is installed on the machine you wish to run the container.\
-First, pull (download) the image with the following command, replacing your username and repository name accordingly.
+## Authors & Acknowledgment
 
-```docker pull <dockerhub_username>/<dockerhub_repo_name>```
+Group 04 – SoPra FS26, University of Zurich:
 
-Then, run the image in a container with the following command, again replacing _<dockerhub_username>_ and _<dockerhub_repo_name>_ accordingly.
+## Authors and Acknowledgment
 
-```docker run -p 3000:3000 <dockerhub_username>/<dockerhub_repo_name>```
+| Name                | GitHub                                                 | Matrikelnumber |
+|---------------------|--------------------------------------------------------|----------------|
+| Antonio Afram       | [@AQuant1](https://github.com/AQuant1)                 | 23-729-775     |
+| Michelle Brauch     | [@Meimira](https://github.com/Meimira)                 | 24-748-618     |
+| Moritz Davinghausen | [@MoritzDav](https://github.com/MoritzDav)             | 24-722-795     |
+| Valya Sorokivska    | [@ValyaSorokivska](https://github.com/ValyaSorokivska) | 24-743-247     |
+| Lars Pataky         | [@bablandan](https://github.com/bablandan)             | 19-923-697     |
+
+Supervised by the SoPra teaching team at the Department of Informatics, UZH.  
+Built on the [SoPra Server Template](https://github.com/HASEL-UZH/sopra-fs25-template-server).
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

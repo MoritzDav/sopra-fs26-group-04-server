@@ -50,7 +50,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Test");
 		testUser.setLastName("User");
 		testUser.setUsername("testuser");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 		testUser.setRole(UserRole.STUDENT);
 
 		// when
@@ -75,7 +75,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Alice");
 		testUser.setLastName("Smith");
 		testUser.setUsername("duplicate");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		// Create first user - should succeed
 		userService.createUser(testUser);
@@ -88,7 +88,7 @@ public class UserServiceIntegrationTest {
 		testUser2.setFirstName("Bob");
 		testUser2.setLastName("Jones");
 		testUser2.setUsername("duplicate");
-		testUser2.setPassword("password456");
+		testUser2.setPassword("SecurePass2");
 
 		// then - check that an error is thrown
 		assertThrows(ResponseStatusException.class, () -> userService.createUser(testUser2));
@@ -101,7 +101,7 @@ public class UserServiceIntegrationTest {
 		teacher.setFirstName("Professor");
 		teacher.setLastName("Smith");
 		teacher.setUsername("prof_smith");
-		teacher.setPassword("password123");
+		teacher.setPassword("SecurePass1");
 		teacher.setRole(UserRole.TEACHER);
 
 		// when
@@ -120,13 +120,13 @@ public class UserServiceIntegrationTest {
 		user1.setFirstName("User");
 		user1.setLastName("One");
 		user1.setUsername("user1");
-		user1.setPassword("pass1");
+		user1.setPassword("SecurePass1");
 
 		User user2 = new User();
 		user2.setFirstName("User");
 		user2.setLastName("Two");
 		user2.setUsername("user2");
-		user2.setPassword("pass2");
+		user2.setPassword("SecurePass2");
 
 		// when
 		User created1 = userService.createUser(user1);
@@ -149,7 +149,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Test");
 		testUser.setLastName("User");
 		testUser.setUsername("gettest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 
@@ -180,7 +180,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Test");
 		testUser.setLastName("User");
 		testUser.setUsername("logouttest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 		assertEquals(UserStatus.ONLINE, createdUser.getStatus());
@@ -212,7 +212,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Login");
 		testUser.setLastName("Test");
 		testUser.setUsername("logintest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 		Long userId = createdUser.getId();
@@ -223,7 +223,7 @@ public class UserServiceIntegrationTest {
 		assertEquals(UserStatus.OFFLINE, offlineUser.getStatus());
 
 		// when
-		User loggedInUser = userService.loginUser("logintest", "password123");
+		User loggedInUser = userService.loginUser("logintest", "SecurePass1");
 
 		// then
 		assertEquals(UserStatus.ONLINE, loggedInUser.getStatus());
@@ -241,13 +241,13 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Test");
 		testUser.setLastName("User");
 		testUser.setUsername("existinguser");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		userService.createUser(testUser);
 
 		// when & then
 		assertThrows(ResponseStatusException.class,
-				() -> userService.loginUser("nonexistent", "password123"));
+				() -> userService.loginUser("nonexistent", "SecurePass1"));
 	}
 
 	@Test
@@ -257,7 +257,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Test");
 		testUser.setLastName("User");
 		testUser.setUsername("testuser2");
-		testUser.setPassword("correctpassword");
+		testUser.setPassword("CorrectPass1");
 
 		userService.createUser(testUser);
 
@@ -275,7 +275,7 @@ public class UserServiceIntegrationTest {
 		user.setFirstName("Token");
 		user.setLastName("Test");
 		user.setUsername("tokentest");
-		user.setPassword("password123");
+		user.setPassword("SecurePass1");
 
 		// when
 		User createdUser = userService.createUser(user);
@@ -293,13 +293,13 @@ public class UserServiceIntegrationTest {
 		user1.setFirstName("User");
 		user1.setLastName("One");
 		user1.setUsername("unique_user1");
-		user1.setPassword("pass1");
+		user1.setPassword("SecurePass1");
 
 		User user2 = new User();
 		user2.setFirstName("User");
 		user2.setLastName("Two");
 		user2.setUsername("unique_user2");
-		user2.setPassword("pass2");
+		user2.setPassword("SecurePass2");
 
 		// when
 		User created1 = userService.createUser(user1);
@@ -318,7 +318,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Login");
 		testUser.setLastName("Token");
 		testUser.setUsername("logintokentest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 		String originalToken = createdUser.getToken();
@@ -327,7 +327,7 @@ public class UserServiceIntegrationTest {
 		userService.logoutUser(originalToken);
 
 		// when
-		User loggedInUser = userService.loginUser("logintokentest", "password123");
+		User loggedInUser = userService.loginUser("logintokentest", "SecurePass1");
 
 		// then
 		assertNotEquals(originalToken, loggedInUser.getToken());
@@ -341,7 +341,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Logout");
 		testUser.setLastName("Token");
 		testUser.setUsername("logouttokentest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 		String originalToken = createdUser.getToken();
@@ -360,7 +360,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Status");
 		testUser.setLastName("Change");
 		testUser.setUsername("statuschangetest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 		assertEquals(UserStatus.ONLINE, createdUser.getStatus());
@@ -373,7 +373,7 @@ public class UserServiceIntegrationTest {
 		assertEquals(originalToken, offlineUser.getToken());
 
 		// when - Login again
-		User loggedInUser = userService.loginUser("statuschangetest", "password123");
+		User loggedInUser = userService.loginUser("statuschangetest", "SecurePass1");
 
 		// then
 		assertEquals(UserStatus.ONLINE, loggedInUser.getStatus());
@@ -391,7 +391,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Concurrent");
 		testUser.setLastName("Session");
 		testUser.setUsername("concurrenttest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 		assertEquals(UserStatus.ONLINE, createdUser.getStatus());
@@ -401,7 +401,7 @@ public class UserServiceIntegrationTest {
 		userService.logoutUser(token);
 
 		// when - Login
-		User login1 = userService.loginUser("concurrenttest", "password123");
+		User login1 = userService.loginUser("concurrenttest", "SecurePass1");
 		assertEquals(UserStatus.ONLINE, login1.getStatus());
 		assertNotEquals(token, login1.getToken());
 
@@ -417,7 +417,7 @@ public class UserServiceIntegrationTest {
 		testUser.setFirstName("Retrieval");
 		testUser.setLastName("Test");
 		testUser.setUsername("retrievaltest");
-		testUser.setPassword("password123");
+		testUser.setPassword("SecurePass1");
 
 		User createdUser = userService.createUser(testUser);
 		String originalToken = createdUser.getToken();
@@ -426,7 +426,7 @@ public class UserServiceIntegrationTest {
 		User retrievedBeforeLogout = userService.getUserById(createdUser.getId());
 		userService.logoutUser(originalToken);
 		User retrievedAfterLogout = userService.getUserById(createdUser.getId());
-		userService.loginUser("retrievaltest", "password123");
+		userService.loginUser("retrievaltest", "SecurePass1");
 		User retrievedAfterLogin = userService.getUserById(createdUser.getId());
 
 		// then
