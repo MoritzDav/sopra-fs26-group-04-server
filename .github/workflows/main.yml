@@ -56,6 +56,8 @@ jobs:
           deliverables: app.yaml
           version: v${{ github.run_number }}
           credentials: ${{ secrets.GCP_SERVICE_CREDENTIALS }}
+          env_vars: |
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
       - name: Test
         run: curl "${{ steps.deploy.outputs.url }}"

@@ -39,6 +39,7 @@ public class CourseService {
     
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int CODE_LENGTH = 6;
+    private static final Random RANDOM = new Random();
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -144,11 +145,10 @@ public class CourseService {
     }
 
     private String generateRandomCode() {
-        Random random = new Random();
         StringBuilder code = new StringBuilder();
 
         for (int i = 0; i < CODE_LENGTH; i++) {
-            code.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
+            code.append(CHARACTERS.charAt(RANDOM.nextInt(CHARACTERS.length())));
         }
 
         return code.toString();

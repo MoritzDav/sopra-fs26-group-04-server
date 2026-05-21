@@ -9,6 +9,8 @@ import ch.uzh.ifi.hase.soprafs26.rest.dto.ChatMessageGetDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.ChatMessagePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 import ch.uzh.ifi.hase.soprafs26.service.ChatMessageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -30,6 +32,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
 
     private final ObjectMapper objectMapper;
 
@@ -146,8 +150,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        System.err.println("WebSocket chat transport error: " + exception.getMessage());
-        exception.printStackTrace();
+        log.error("WebSocket chat transport error on session {}", session.getId(), exception);
     }
 
     /**
