@@ -48,6 +48,12 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SERVICE_CREDENTIALS }}
 
+      - name: Inject secrets into app.yaml
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          printf '\nenv_variables:\n  GEMINI_API_KEY: "%s"\n' "$GEMINI_API_KEY" >> app.yaml
+
       - name: Deploy to App Engine
         id: deploy
         uses: google-github-actions/deploy-appengine@54d5fc7167ec790eb0233905e3cef384221b4619
