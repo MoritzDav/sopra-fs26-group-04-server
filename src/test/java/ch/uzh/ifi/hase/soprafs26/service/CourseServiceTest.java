@@ -3,6 +3,7 @@ package ch.uzh.ifi.hase.soprafs26.service;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.repository.CourseEnrollmentRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.PersonalWhiteboardRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.SessionFileRepository;
@@ -41,6 +42,9 @@ public class CourseServiceTest {
     private SessionFileRepository sessionFileRepository;
 
     @Mock
+    private CourseEnrollmentRepository courseEnrollmentRepository;
+
+    @Mock
     private OutlookService outlookService;
  
     @InjectMocks
@@ -72,7 +76,7 @@ public class CourseServiceTest {
         course.setTeacher(teacher);
         course.setCourseCode("ABC123");
 
-        courseService = new CourseService(courseRepository, userRepository, sessionRepository, personalWhiteboardRepository, sessionFileRepository, outlookService);
+        courseService = new CourseService(courseRepository, userRepository, sessionRepository, personalWhiteboardRepository, sessionFileRepository, courseEnrollmentRepository, outlookService);
     }
 
 

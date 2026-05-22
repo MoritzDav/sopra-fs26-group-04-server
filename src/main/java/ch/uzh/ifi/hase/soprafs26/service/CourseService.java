@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import ch.uzh.ifi.hase.soprafs26.repository.CourseEnrollmentRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
@@ -42,6 +43,7 @@ public class CourseService {
     private final SessionRepository sessionRepository;
     private final PersonalWhiteboardRepository personalWhiteboardRepository;
     private final SessionFileRepository sessionFileRepository;
+    private final CourseEnrollmentRepository courseEnrollmentRepository;
     private final OutlookService outlookService;
     
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -56,12 +58,14 @@ public class CourseService {
                          @Qualifier("sessionRepository") SessionRepository sessionRepository,
                          @Qualifier("personalWhiteboardRepository") PersonalWhiteboardRepository personalWhiteboardRepository,
                          @Qualifier("sessionFileRepository") SessionFileRepository sessionFileRepository,
+                         @Qualifier("courseEnrollmentRepository") CourseEnrollmentRepository courseEnrollmentRepository,
                          OutlookService outlookService) {
 		this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.personalWhiteboardRepository = personalWhiteboardRepository;
         this.sessionFileRepository = sessionFileRepository;
+        this.courseEnrollmentRepository = courseEnrollmentRepository;
         this.outlookService = outlookService;
 	}
 
@@ -149,6 +153,8 @@ public class CourseService {
 
         //Delete all sessions
         sessionRepository.deleteByCourseId(courseId);
+
+        courseEnrollmentRepository.deleteAll(courseEnrollmentRepository.findByCourseId(courseId));
 
         courseRepository.delete(course);
 
