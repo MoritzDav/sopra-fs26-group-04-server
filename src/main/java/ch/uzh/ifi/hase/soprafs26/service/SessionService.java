@@ -317,8 +317,8 @@ public class SessionService {
                     String encodedPdf = Base64.getEncoder().encodeToString(whiteboardPdf);
                     currentPage.setBackgroundFile("data:application/pdf;base64," + encodedPdf);
                     whiteboardPageRepository.save(currentPage);
-                } catch (ResponseStatusException e) {
-                    log.warn("Skipping whiteboard PDF export for session {}: {}", sessionId, e.getReason());
+                } catch (Exception e) {
+                    log.warn("Skipping whiteboard PDF export for session {}: {}", sessionId, e.getMessage());
                 }
             }
         }

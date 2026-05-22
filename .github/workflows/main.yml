@@ -43,6 +43,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Inject secrets into app.yaml
+        run: |
+          echo "" >> app.yaml
+          echo "env_variables:" >> app.yaml
+          echo "  GEMINI_API_KEY: \"${{ secrets.GEMINI_API_KEY }}\"" >> app.yaml
+
       - name: Deploy to App Engine
         id: deploy
         uses: google-github-actions/deploy-appengine@73c9b744497731a865297e5fc4e9653b4fd6f14d
@@ -50,8 +56,6 @@ jobs:
           deliverables: app.yaml
           version: v${{ github.run_number }}
           credentials: ${{ secrets.GCP_SERVICE_CREDENTIALS }}
-          env_vars: |
-            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
       - name: Test
         run: curl "${{ steps.deploy.outputs.url }}"
