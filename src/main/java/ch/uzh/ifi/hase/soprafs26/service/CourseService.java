@@ -1,6 +1,8 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
 
+import ch.uzh.ifi.hase.soprafs26.repository.PersonalWhiteboardRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.SessionFileRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +17,10 @@ import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
 import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
+import ch.uzh.ifi.hase.soprafs26.entity.Session;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
+
+import java.util.List;
 
 import java.security.SecureRandom;
 import com.google.zxing.BarcodeFormat;
@@ -35,6 +40,8 @@ public class CourseService {
 	private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final SessionRepository sessionRepository;
+    private final PersonalWhiteboardRepository personalWhiteboardRepository;
+    private final SessionFileRepository sessionFileRepository;
     private final OutlookService outlookService;
     
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -47,10 +54,14 @@ public class CourseService {
 	public CourseService(@Qualifier("courseRepository") CourseRepository courseRepository,
                          @Qualifier("userRepository") UserRepository userRepository,
                          @Qualifier("sessionRepository") SessionRepository sessionRepository,
+                         @Qualifier("personalWhiteboardRepository") PersonalWhiteboardRepository personalWhiteboardRepository,
+                         @Qualifier("sessionFileRepository") SessionFileRepository sessionFileRepository,
                          OutlookService outlookService) {
 		this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
+        this.personalWhiteboardRepository = personalWhiteboardRepository;
+        this.sessionFileRepository = sessionFileRepository;
         this.outlookService = outlookService;
 	}
 
@@ -122,6 +133,19 @@ public class CourseService {
         //Validation process
         validateTeacher(user);
         validateCourseOwner(course, user);
+
+        // Clean up session children that have no JPA cascade before bulk-deleting sessions
+        List<Session> sessions = sessionRepository.findByCourseId(courseId);
+        for (Session session : sessions) {
+            if (session.getSelectedWhiteboard() != null) {
+                session.setSelectedWhiteboard(null);
+                sessionRepository.save(session);
+            }
+            personalWhiteboardRepository.deleteAll(
+                personalWhiteboardRepository.findBySessionSessionId(session.getSessionId()));
+            sessionFileRepository.deleteAll(
+                sessionFileRepository.findBySessionSessionId(session.getSessionId()));
+        }
 
         //Delete all sessions
         sessionRepository.deleteByCourseId(courseId);
