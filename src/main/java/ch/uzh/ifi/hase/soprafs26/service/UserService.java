@@ -190,19 +190,46 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Password must be at least 8 characters long.");
         }
-        if (!password.matches(".*[A-Z].*")) {
+		if (!containsUppercase(password)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Password must contain at least one uppercase letter.");
         }
-        if (!password.matches(".*[a-z].*")) {
+		if (!containsLowercase(password)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Password must contain at least one lowercase letter.");
         }
-        if (!password.matches(".*[0-9].*")) {
+		if (!containsDigit(password)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Password must contain at least one digit.");
         }
     }
+
+	private boolean containsUppercase(String password) {
+		for (int i = 0; i < password.length(); i++) {
+			if (Character.isUpperCase(password.charAt(i))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean containsLowercase(String password) {
+		for (int i = 0; i < password.length(); i++) {
+			if (Character.isLowerCase(password.charAt(i))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean containsDigit(String password) {
+		for (int i = 0; i < password.length(); i++) {
+			if (Character.isDigit(password.charAt(i))) {
+				return true;
+			}
+		}
+		return false;
+	}
 
     private void checkIfUserExists(User userToBeCreated) {
         User userByUsername = userRepository.findByUsername(userToBeCreated.getUsername());
