@@ -4,6 +4,8 @@ import ch.uzh.ifi.hase.soprafs26.constant.UserRole;
 import ch.uzh.ifi.hase.soprafs26.entity.Course;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.repository.CourseRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.PersonalWhiteboardRepository;
+import ch.uzh.ifi.hase.soprafs26.repository.SessionFileRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.SessionRepository;
 import ch.uzh.ifi.hase.soprafs26.repository.UserRepository;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.CoursePutDTO;
@@ -31,6 +33,12 @@ public class CourseServiceTest {
 
     @Mock
     private SessionRepository sessionRepository;
+
+    @Mock
+    private PersonalWhiteboardRepository personalWhiteboardRepository;
+
+    @Mock
+    private SessionFileRepository sessionFileRepository;
 
     @Mock
     private OutlookService outlookService;
@@ -64,7 +72,7 @@ public class CourseServiceTest {
         course.setTeacher(teacher);
         course.setCourseCode("ABC123");
 
-        courseService = new CourseService(courseRepository, userRepository, sessionRepository, outlookService);
+        courseService = new CourseService(courseRepository, userRepository, sessionRepository, personalWhiteboardRepository, sessionFileRepository, outlookService);
     }
 
 
