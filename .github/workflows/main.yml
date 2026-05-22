@@ -43,15 +43,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_CREDENTIALS }}
+
       - name: Deploy to App Engine
         id: deploy
-        uses: google-github-actions/deploy-appengine@73c9b744497731a865297e5fc4e9653b4fd6f14d
+        uses: google-github-actions/deploy-appengine@54d5fc7167ec790eb0233905e3cef384221b4619
         with:
           deliverables: app.yaml
           version: v${{ github.run_number }}
-          credentials: ${{ secrets.GCP_SERVICE_CREDENTIALS }}
-          env_vars: |
-            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
       - name: Test
         run: curl "${{ steps.deploy.outputs.url }}"
